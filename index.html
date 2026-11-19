@@ -680,19 +680,7 @@ const SH={x0:169,y0:92,w:62,h:40}; // shelter in buffer coords
   // ruins: concrete slabs with cracks, rebar and moss
   seed=23;
   const blocks=[];for(let i=0;i<9;i++){const bl={x:L(45+rnd()*190)|0,y:L(30+rnd()*120)|0,w:L(30+rnd()*45)|0,h:L(22+rnd()*35)|0,g:150+rnd()*40|0};rnd();blocks.push(bl)}
-  seed=41;
-  for(const {x,y,w,h,g} of blocks){
-    b.fillStyle='rgba(8,10,6,.4)';b.fillRect(x+3,y+4,w,h);
-    for(let yy=0;yy<h;yy++)for(let xx=0;xx<w;xx++){let v=g+(rnd()*10-5)+(bay(xx,yy)-.5)*8;if(yy<2)v+=22;if(yy>=h-3)v-=34;if(xx>=w-3)v-=26;if(xx<1)v+=10;v=v|0;P(b,x+xx,y+yy,`rgb(${v},${v-6},${v-14})`)}
-    // chipped corners
-    P(b,x,y,'rgba(0,0,0,0)');b.clearRect(x,y,1,1);
-    // cracks
-    for(let k=0;k<2;k++){let cx=x+3+(rnd()*(w-6)|0),cy=y+1;b.fillStyle='#4e4a44';for(let s=0;s<h*.8;s++){b.fillRect(cx,cy,1,1);cy++;if(rnd()<.45)cx+=rnd()<.5?-1:1;if(cx<x+1||cx>x+w-2)break}}
-    // rebar
-    if(rnd()<.7){const rx=x+2+(rnd()*(w-4)|0);for(let s=0;s<5;s++)P(b,rx+(s>>1),y-s,'#7a4a2a');P(b,rx+2,y-5,'#a0623a')}
-    // moss
-    for(let k=0;k<w*h*.08;k++){const mx=x+(rnd()*w|0),my=y+h-1-(rnd()*rnd()*h|0);P(b,mx,my,rnd()<.5?'#4f6a34':'#5e7c3c')}
-  }
+  for(const {x,y,w,h} of blocks){b.fillStyle='rgba(8,10,6,.4)';b.fillRect(x+4,y+3,w+2,h)}
   for(let i=0;i<140;i++){const x=L(30+rnd()*230),y=L(20+rnd()*155),c=rnd();P(b,x,y,c<.4?'#8a867c':c<.8?'#6e6a62':'#a8a49a',rnd()<.3?2:1,1)}
   // river
   const nr=noiseGrid(10,LW,LH);
@@ -703,8 +691,6 @@ const SH={x0:169,y0:92,w:62,h:40}; // shelter in buffer coords
       else if(x<bx+8)col=bay(x,y)<.4?'#6b583a':'#776242';
       else{const v=nr(x,y);col=v<.35?'#6f5c3c':v<.7?'#7a6643':'#84704a'}
       P(b,x,y,col)}}
-  // bus stop post
-  P(b,288,22,'#3a332c',2,34);P(b,288,22,'#6a6158',1,34);P(b,283,18,'#3f6fa8',12,6);P(b,284,19,'#5a86bd',10,1);P(b,290,22,'#2a4f80',5,2);P(b,286,20,'#e8e8e0',3,1);
   // shelter
   const {x0,y0,w,h}=SH;
   b.fillStyle='rgba(8,10,6,.45)';b.fillRect(x0+3,y0+4,w,h);
@@ -712,47 +698,130 @@ const SH={x0:169,y0:92,w:62,h:40}; // shelter in buffer coords
   for(let y=y0+3;y<y0+h-3;y++){const row=Math.floor((y-y0-3)/4);for(let x=x0+3;x<x0+w-3;x++){
     let col=row%2?'#87704f':'#8f7755';if((y-y0-3)%4===3)col='#6a5539';if(((x+row*13)%19)===0)col='#6a5539';if(rnd()<.05)col=row%2?'#7d6748':'#957c5a';P(b,x,y,col)}}
   for(let i=0;i<14;i++)P(b,x0+5+rnd()*(w-10),y0+5+rnd()*(h-10),'#5a4630');
-  const log=(x,y,len,vert)=>{for(let i=0;i<len;i++){const px2=vert?x:x+i,py=vert?y+i:y;const seg=i%11===0;
-    P(b,px2,py,seg?'#3a2a1b':'#7a5c3e');P(b,vert?px2+1:px2,vert?py:py+1,seg?'#2f2216':'#5e4630');P(b,vert?px2+2:px2,vert?py:py+2,seg?'#2a1e14':'#46331f')}};
-  log(x0,y0,w,false);log(x0,y0+h-3,23,false);log(x0+w-23,y0+h-3,23,false);log(x0,y0,h,true);log(x0+w-3,y0,h,true);
-  [[x0-1,y0-1],[x0+w-4,y0-1],[x0-1,y0+h-4],[x0+w-4,y0+h-4]].forEach(([x,y])=>{P(b,x,y,'#2e2116',5,5);P(b,x+1,y+1,'#5a4330',3,3);P(b,x+1,y+1,'#6e5238',2,1)});
   P(b,x0+23,y0+h-2,'#5e4a34',16,2);P(b,x0+23,y0+h-2,'#77603f',16,1);
-  // radio
-  const rx=178,ry=101;
-  P(b,rx+1,ry+1,'rgba(0,0,0,.35)',13,9);P(b,rx,ry,'#2a2926',13,9);P(b,rx+1,ry+1,'#46443e',11,7);P(b,rx+1,ry+1,'#58564e',11,1);
-  for(let i=0;i<3;i++)for(let j=0;j<3;j++)P(b,rx+2+i*2,ry+3+j*2,'#22211e');
-  P(b,rx+8,ry+2,'#cdb88c',4,3);P(b,rx+9,ry+3,'#8a3a2a');P(b,rx+8,ry+6,'#9a968a',2,2);P(b,rx+10,ry+6,'#9a968a',2,2);
-  for(let i=0;i<7;i++)P(b,rx+11+i,ry-1-i,'#8a8a86');P(b,rx+18,ry-8,'#c8c8c0');
-  // crate
-  const cx2=x0+5,cy2=y0+h-13;P(b,cx2+1,cy2+1,'rgba(0,0,0,.35)',9,8);P(b,cx2,cy2,'#6e5232',9,8);P(b,cx2,cy2,'#8a6a42',9,1);P(b,cx2,cy2+4,'#4e3a24',9,1);P(b,cx2+4,cy2,'#4e3a24',1,8);
-  // bed
-  const bx=210,by=102;
-  P(b,bx+1,by+1,'rgba(0,0,0,.35)',17,21);P(b,bx,by,'#3c2c1e',17,21);P(b,bx+1,by+1,'#5f6e7e',15,19);
-  for(let y=0;y<19;y++)P(b,bx+1,by+1+y,'#71818f',2,1);
-  P(b,bx+2,by+2,'#d8d2c2',13,5);P(b,bx+2,by+2,'#ece6d6',13,1);P(b,bx+2,by+6,'#b8b0a0',13,1);
-  P(b,bx+1,by+10,'#8a4b3c',15,10);P(b,bx+1,by+10,'#a35c4a',15,1);for(let x=0;x<15;x+=3)P(b,bx+1+x,by+12,'#6a3428',1,8);
-  // campfire stones + logs
-  const fx=200,fy=172;
-  for(let i=0;i<10;i++){const a=i/10*Math.PI*2,x=fx+Math.cos(a)*8.5,y=fy+Math.sin(a)*5.5;P(b,x-1,y,'#5c5a54',3,2);P(b,x-1,y,'#9a968c',2,1);P(b,x+1,y+1,'#3a3833')}
-  P(b,fx-4,fy-1,'#3a3a36',8,3);
-  for(let i=0;i<9;i++){P(b,fx-5+i,fy+1-(i>>2),'#5a3e26');P(b,fx-5+i,fy-3+(i>>2),'#6a4a2c')}
   // tree shadows
   for(const t of trees){b.fillStyle='rgba(10,16,8,.32)';b.beginPath();b.ellipse(L(t.x)+3,L(t.y)+5,t.r*1.1,t.r*.42,0,0,7);b.fill()}
 })();
 
-// --- car (two states) ---
-function makeCar(open){const [c,x]=mk(46,30);x.translate(23,15);x.rotate(-.18);x.translate(-20,-11);
-  x.fillStyle='rgba(8,10,6,.45)';x.fillRect(3,4,40,22);
-  P(x,0,1,'#5a2e1a',40,22);P(x,1,2,'#8a4b2c',38,20);P(x,1,2,'#a35f38',38,2);P(x,1,20,'#6a3520',38,2);
-  P(x,11,4,'#6e3a22',18,16);P(x,12,5,'#7d4428',16,14);
-  P(x,7,5,'#6f949e',4,14);P(x,29,5,'#6f949e',4,14);P(x,8,6,'#c8dde0',1,5);P(x,30,6,'#a8c4ca',1,3);
-  [[3,6],[34,14],[18,18],[22,3],[6,16]].forEach(([a,b])=>{P(x,a,b,'#5e3018',3,2);P(x,a+1,b,'#4a2412')});
-  P(x,39,4,'#e0d8a0',1,3);P(x,39,16,'#e0d8a0',1,3);
-  P(x,4,0,'#1e1a17',6,2);P(x,30,0,'#1e1a17',6,2);P(x,4,23,'#1e1a17',6,2);P(x,30,23,'#1e1a17',6,2);
-  if(open){P(x,0,3,'#1e130c',6,18);P(x,1,4,'#2e1d12',4,16);P(x,-5,2,'#7a4026',5,20);P(x,-5,2,'#9a5a36',1,20)}
-  ['#3e5a2a','#4f6a34','#5e7c3c'].forEach((col,i)=>{P(x,34+i,1+i*2,col,3,2);P(x,1+i,19-i,col,2,3)});
-  return c}
-const CAR=makeCar(false),CAR_OPEN=makeCar(true);
+// ---------- sprite stacking (fixed camera) ----------
+// Objects are built from top-down slices, bottom first; each slice is drawn 1px higher than the one below
+// and the whole stack is baked into one canvas, so drawing costs the same as a flat sprite.
+function stackLayers(w,h,n,fn,dark=.38){const L=[];for(let i=0;i<n;i++){const [c,x]=mk(w,h);fn(x,i,n);x.globalCompositeOperation='source-atop';x.fillStyle=`rgba(0,0,0,${(1-i/(n-1||1))*dark})`;x.fillRect(0,0,w,h);L.push(c)}return L}
+function bake(L,rot=0){
+  const n=L.length,w=L[0].width,h=L[0].height,fw=rot?Math.ceil(Math.hypot(w,h))+2:w,fh=rot?fw:h;
+  const [c,x]=mk(fw,fh+n);x.imageSmoothingEnabled=false;
+  for(let i=0;i<n;i++){x.save();x.translate(fw/2,fh/2+n-1-i);x.rotate(rot);x.drawImage(L[i],-w/2|0,-h/2|0);x.restore()}
+  return {c,ox:fw/2,oy:fh/2+n-1,hh:fh/2};
+}
+const putStack=(s,fx,fy)=>lc.drawImage(s.c,Math.round(fx-s.ox),Math.round(fy-s.oy));
+const ellipseFill=(x,cx,cy,rx,ry,col)=>{for(let y=-Math.ceil(ry);y<=ry;y++)for(let xx=-Math.ceil(rx);xx<=rx;xx++)if((xx*xx)/(rx*rx||1)+(y*y)/(ry*ry||1)<=1)P(x,cx+xx,cy+y,typeof col==='function'?col(xx,y):col)};
+
+// --- trees ---
+function stackTree(r,s,birch){seed=s;const n=Math.round(r*2.5)+(birch?6:0),sz=Math.ceil(r*2+6),c0=sz/2|0,trunkTop=Math.round(n*(birch?.6:.45)),crown0=Math.round(n*(birch?.5:.32));
+  return bake(stackLayers(sz,sz,n,(x,i)=>{
+    if(i<trunkTop){if(birch){P(x,c0-1,c0-1,(i%4===1||i%5===3)?'#2a2620':'#e8e2d2',3,3);P(x,c0+1,c0-1,'#bdb6a6',1,3)}else{P(x,c0-1,c0-1,'#4a3624',3,3);P(x,c0-1,c0-1,'#5e4630',1,3)}}
+    if(i>=crown0){const t=(i-crown0)/(n-crown0-1||1),rr=r*Math.sqrt(Math.max(0,1-Math.pow(t*2-1,2)))+.5;
+      ellipseFill(x,c0,c0,rr,rr,(dx,dy)=>{const v=rnd();if(v<.05)return 'rgba(0,0,0,0)';const lit=(-dx-dy)/(rr+1)+t*.5;
+        if(birch)return lit>.6?'#86b05a':lit>.1?(v<.4?'#6e9a48':'#5a823a'):'#4a6e30';
+        return lit>.6?(v<.4?'#6aa656':'#5a9447'):lit>.1?(v<.35?'#477a3a':'#3a6830'):(v<.5?'#2e5428':'#264a22')})}
+  },.34));
+}
+trees.forEach((t,i)=>{t.st=stackTree(t.r,100+i)});
+// --- ruins: broken concrete slabs ---
+seed=23;
+const RUINS=[];for(let i=0;i<9;i++){const bl={x:L(45+rnd()*190)|0,y:L(30+rnd()*120)|0,w:L(30+rnd()*45)|0,h:L(22+rnd()*35)|0,g:150+rnd()*40|0};rnd();RUINS.push(bl)}
+seed=41;
+RUINS.forEach(b=>{
+  const n=5+(rnd()*9|0),nz=noiseGrid(4,b.w+8,b.h+8),rebar=rnd()<.7?[1+(rnd()*(b.w-3)|0),1+(rnd()*(b.h-3)|0)]:null,crack=1+(rnd()*(b.w-3)|0);
+  const L2=stackLayers(b.w,b.h,n+(rebar?5:0),(x,i)=>{
+    if(i>=n){if(rebar){P(x,rebar[0]+((i-n)>>1),rebar[1],i===n+4?'#a0623a':'#7a4a2a')}return}
+    const erode=i>n-4?(i-(n-4))*.22:0;
+    for(let yy=0;yy<b.h;yy++)for(let xx=0;xx<b.w;xx++){
+      if(nz(xx,yy)<erode)continue;
+      let v=b.g+(((xx*7+yy*13+i*5)%11)-5)+(bay(xx,yy)-.5)*6;if(i===n-1||nz(xx,yy)<erode+.12)v+=18;v|=0;
+      let col=`rgb(${v},${v-6},${v-14})`;
+      if(i<3&&(xx===0||yy===b.h-1||xx===b.w-1)&&((xx*3+yy*5+i)%4===0))col=(xx+yy)%2?'#4f6a34':'#5e7c3c';
+      if(i===n-1&&xx===crack+((yy>>2)%2))col='#4e4a44';
+      P(x,xx,yy,col)}
+  },.42);
+  b.st=bake(L2);b.n=n;
+});
+// --- shelter: log walls, split into back (drawn before the hero) and front (sorted with the hero) ---
+const SHN=9;
+function shelterPart(front,roof,blanket){
+  const W2=64,H2=42;
+  return bake(stackLayers(W2,H2,SHN+2,(x,i,n)=>{
+    const top=i===SHN-1,log=i%2?'#7a5c3e':'#6a4e34',seam=i%2?'#5a4230':'#4a3424';
+    const wall=(a,b,w,h)=>{if(i>=SHN)return;P(x,a,b,top?'#8e6e4a':log,w,h);if(!top)for(let k=a+((i*5)%11);k<a+w;k+=11)P(x,k,b,seam,1,h)};
+    if(!front){wall(1,1,62,3);wall(1,1,3,40);wall(60,1,3,40);
+      if(top&&roof){for(let k=17;k<47;k++)P(x,k,0,k%2?'#7b8186':'#a4aaae',1,4);P(x,17,0,'#c4cace',30,1)}
+      if(i<4){P(x,42,11,i===3?'#5f6e7e':'#3c2c1e',16,20);if(i===3){P(x,43,12,'#d8d2c2',14,5);P(x,43,12,'#ece6d6',14,1);P(x,43,19,'#8a4b3c',14,11);for(let k=0;k<14;k+=3)P(x,43+k,21,'#6a3428',1,9)}}
+      if(i<3){P(x,10,10,i===2?'#46443e':'#2a2926',13,9);if(i===2){P(x,18,11,'#cdb88c',4,3);P(x,19,12,'#8a3a2a');for(let a=0;a<3;a++)for(let b=0;b<3;b++)P(x,11+a*2,13+b*2,'#22211e')}}
+      if(i>=3&&i<10)P(x,21,11,'#9a9a96');
+      if(i<5)P(x,6,28,i===4?'#8a6a42':'#6e5232',9,8);if(i===4){P(x,6,32,'#4e3a24',9,1);P(x,10,28,'#4e3a24',1,8)}
+      [[0,0],[59,0]].forEach(([a,b])=>P(x,a,b,i===n-1?'#6e5238':'#3a2a1b',5,5));
+    }else{
+      wall(1,38,23,3);wall(40,38,23,3);
+      if(blanket&&i<SHN-1){P(x,24,39,i===SHN-2?'#a35c4a':'#8a5040',16,1);if(i%2)for(let k=24;k<40;k+=3)P(x,k,39,'#5a3428')}
+      [[0,37],[59,37]].forEach(([a,b])=>P(x,a,b,i===n-1?'#6e5238':'#3a2a1b',5,5));
+    }
+  },.36));
+}
+const SH_BACK=[shelterPart(false,false),shelterPart(false,true)],SH_FRONT=[shelterPart(true,false,false),shelterPart(true,false,true)];
+const SH_C={x:SH.x0-1+32,y:SH.y0-1+21};
+// --- car ---
+function stackCar(open){return bake(stackLayers(44,26,13,(x,i)=>{
+  if(i<3){[[5,1],[31,1],[5,21],[31,21]].forEach(([a,b])=>P(x,a,b,'#1e1a17',7,4));if(i<1)return}
+  if(i>=2&&i<=7){P(x,2,3,i===7?'#a35f38':'#8a4b2c',40,20);P(x,3,2,i===7?'#a35f38':'#8a4b2c',38,22);
+    if(i===7){[[6,6],[34,16],[20,19],[24,4],[8,17]].forEach(([a,b])=>P(x,a,b,'#6a3520',3,2));P(x,41,5,'#e0d8a0',1,3);P(x,41,17,'#e0d8a0',1,3);P(x,36,4,'#4f6a34',4,2);P(x,3,20,'#4f6a34',3,2)}
+    if(i===5)P(x,2,13,'#5a2e1a',40,1);
+    if(open&&i>=4)P(x,2,5,i===7?'#1e130c':'#2e1d12',6,16)}
+  if(open&&i>=8&&i<=12)P(x,1,4,i===12?'#9a5a36':'#7a4026',2,18);
+  if(i>=8&&i<=11){P(x,12,5,i===11?'#7d4428':'#6f949e',19,16);P(x,13,6,i===11?'#8a4c2e':'#8fb0b8',17,14)}
+  if(i===12){P(x,14,7,'#9a5a36',15,12);P(x,15,8,'#a86a42',6,2)}
+}),-.18)}
+const CAR_ST=[stackCar(false),stackCar(true)];
+// --- barrel (dry / some water / full) ---
+const BARREL_ST=[0,1,2].map(w=>bake(stackLayers(16,16,10,(x,i,n)=>{
+  ellipseFill(x,8,8,6.4,6.4,(dx,dy)=>i===1||i===6?'#55554f':((Math.round(Math.atan2(dy,dx)*4)%2)?'#5a402a':'#7a5a3a'));
+  if(i===n-1){ellipseFill(x,8,8,4.4,4.4,w?'#3e5f78':'#2a2018');ellipseFill(x,8,8,3.4,3.4,(dx,dy)=>!w?'#3a2c20':dx+dy<-2?'#8cc0dc':'#4f82a4');if(w)P(x,6,6,'#e0f0f8');if(w===2)P(x,7,5,'#e0f0f8')}
+})));
+// --- berry bush (8 / 3 / 0 berries) ---
+const BUSH_ST=[8,3,0].map(nb=>{seed=31;return bake(stackLayers(22,18,8,(x,i,n)=>{const t=i/(n-1),r=7.5*Math.sqrt(Math.max(0,1-Math.pow(t*1.1-.15,2)));
+  ellipseFill(x,11,9,r+.3,r*.8+.3,(dx,dy)=>{const v=rnd();return (dx+dy)<-2?(v<.4?'#4f8840':'#417336'):(v<.3?'#2b4f26':'#35602d')});
+  if(i>=n-3){[[-4,-3],[2,-4],[4,1],[-2,2],[0,-1],[5,-2],[-5,0],[1,3]].slice(0,nb).forEach(([a,b],k)=>{if((k+i)%3!==0){P(x,11+a,9+b,'#b02a3e');P(x,11+a,8+b,'#f07080')}})}
+}))});
+// --- rock ---
+const ROCK_ST=bake(stackLayers(18,14,6,(x,i)=>{seed=90+i;ellipseFill(x,9,7,7.5-i*.9,5.5-i*.6,(dx,dy)=>{const v=rnd();return (dx+dy<-2)?(v<.3?'#bdbab0':'#a3a096'):(v<.25?'#66635c':'#86837a')})}),.3);
+// --- campfire stones ---
+const STONES_ST=bake(stackLayers(24,16,3,(x,i)=>{for(let k=0;k<10;k++){const a=k/10*Math.PI*2,sx=12+Math.cos(a)*8.5,sy=8+Math.sin(a)*5.5;P(x,sx-1,sy,i===2?'#9a968c':'#6e6a62',3,2)}if(i===2){P(x,8,7,'#5a3e26',9,1);P(x,9,9,'#6a4a2c',7,1);P(x,10,8,'#3a3a36',4,1)}}));
+// --- bus stop pole with sign ---
+const STOP_ST=bake(stackLayers(14,4,30,(x,i)=>{P(x,6,1,i%3?'#5a5148':'#6a6158',2,2);if(i>=22&&i<28){P(x,1,2,i===27?'#5a86bd':'#3f6fa8',12,1);if(i===24||i===25)P(x,4,2,'#e8e8e0',3,1)}},.3));
+// --- pharmacy wall (day 5+) and birch (day 3+) ---
+const BIRCH_ST=stackTree(8,777,true);
+const PHARM_ST=bake(stackLayers(28,6,16,(x,i,n)=>{
+  for(let xx=0;xx<28;xx++){if(i>n-5&&xx>10+(n-i)*3)continue;const v=(176+((xx*7+i*13)%9))|0;P(x,xx,1,`rgb(${v},${v-8},${v-16})`,1,4)}
+  if(i>=2&&i<11)P(x,4,1,'#2a2622',6,4);if(i>=5&&i<10){P(x,15,1,'#3a4a52',7,4);P(x,16,1,'#6a8a96',2,1)}
+  if(i>=8&&i<12&&[[11],[13],[16],[19],[22]].length)[11,13,16,19,22].forEach(k=>{if((k+i)%3===0)P(x,k,1,'#e8e8e0',2,1)});
+  if(i>=n-6&&i<n){P(x,1,0,'#e8e8e0',7,2);if(i>n-5&&i<n-1)P(x,3,0,'#3aa060',3,2)}
+},.3));
+// sorted pass: everything that can stand in front of or behind the hero
+function sortedItems(){
+  const it=[];
+  for(const t of trees)it.push({y:L(t.y)+5,f:()=>putStack(t.st,L(t.x),L(t.y)+4)});
+  for(const b of RUINS)it.push({y:b.y+b.h,f:()=>putStack(b.st,b.x+b.w/2,b.y+b.h/2)});
+  it.push({y:SH.y0+3,f:()=>putStack(SH_BACK[S.prep.roof?1:0],SH_C.x,SH_C.y)});
+  it.push({y:SH.y0+SH.h,f:()=>putStack(SH_FRONT[S.prep.door?1:0],SH_C.x,SH_C.y)});
+  it.push({y:108,f:()=>putStack(CAR_ST[S.car>=1?1:0],264,98)});
+  it.push({y:152,f:()=>putStack(BARREL_ST[S.barrelFull?2:(!S.barrel?1:0)],244,148)});
+  it.push({y:157,f:()=>putStack(BUSH_ST[S.bush>=2?2:S.bush?1:0],166,152)});
+  it.push({y:S.rock?172:169,f:()=>{if(S.rock){P(lc,296,162,'#4a3e2c',9,5);P(lc,297,163,'#3a2f20',6,3)}putStack(ROCK_ST,S.rock?309:303,S.rock?168:165)}});
+  it.push({y:52,f:()=>putStack(STOP_ST,289,50)});
+  if(S.day>=3)it.push({y:L(318)+5,f:()=>putStack(BIRCH_ST,L(36),L(318)+4)});
+  if(S.day>=5)it.push({y:L(256)+4,f:()=>putStack(PHARM_ST,24,L(256)+1)});
+  return it;
+}
+
 
 
 // --- rain: two depth layers, random placement, streaks aligned with the fall direction, splashes on the ground ---
@@ -784,18 +853,9 @@ function draw(now){
   lc.drawImage(bg,0,0);
   // river ripples
   for(let i=0;i<34;i++){const y=(((now/70)+i*7)%250|0)-5,x=340+((i*11)%56);lc.fillStyle=i%3?'#8e7a52':'#a08a60';px(lc,x,y,2+(i%3),1)}
-  // car, barrel, bush, rock
-  lc.drawImage(S.car>=1?CAR_OPEN:CAR,241,83);
-  { const cx=244,cy=148;lc.fillStyle='rgba(8,10,6,.45)';lc.beginPath();lc.ellipse(cx+2,cy+3,7,4,0,0,7);lc.fill();
-    const water=S.barrelFull?2:(!S.barrel?1:0);
-    for(let dy=-6;dy<=6;dy++)for(let dx=-6;dx<=6;dx++){const d=Math.hypot(dx,dy);if(d>6.3)continue;
-      let col=d>5.9?'#2e2014':d>4.9?((Math.round(Math.atan2(dy,dx)*4)%2)?'#5a402a':'#7a5a3a'):d>4.3?'#55554f':water===0?(d>3.4?'#2a2018':'#3a2c20'):(d>3.4?'#2f4a5e':((dx+dy)<-2?'#7fb4d2':'#4f82a4'));
-      if(d>4.9&&d<=5.9&&dy<-2)col='#8a6a46';P(lc,cx+dx,cy+dy,col)}
-    if(water)P(lc,cx-2,cy-2,'#d8eef8');if(water===2)P(lc,cx-1,cy-3,'#d8eef8');
-  }
-  lc.drawImage(BUSH,154,141);
-  if(S.bush<2)BERRIES.slice(0,S.bush?3:8).forEach(([x,y])=>{P(lc,166+x,151+y,'#b02a3e',2,2);P(lc,166+x,151+y,'#f07080')});
-  if(S.rock){P(lc,296,162,'#4a3e2c',9,5);P(lc,297,163,'#3a2f20',6,3);lc.drawImage(ROCK,304,160)}else lc.drawImage(ROCK,294,157);
+  // ground shadows of stacked objects, campfire stones
+  lc.fillStyle='rgba(8,10,6,.36)';[[268,104,21,8],[247,153,8,3],[169,157,10,4],[S.rock?311:305,S.rock?171:168,8,3],[291,52,3,1]].forEach(([x,y,rx,ry])=>{lc.beginPath();lc.ellipse(x,y,rx,ry,0,0,7);lc.fill()});
+  putStack(STONES_ST,200,172);
   // day-2 world details
   if(S.day>=2){
     if(S.metalLeft>0){for(let k=0;k<S.metalLeft;k++){const mx=95+k*5,my=30+k*4;P(lc,mx+1,my+1,'rgba(0,0,0,.35)',14,8);for(let i=0;i<14;i++)P(lc,mx+i,my,i%2?'#7b8186':'#a4aaae',1,8);P(lc,mx,my,'#c4cace',14,1);P(lc,mx+3,my+5,'#8a5a3a',3,2)}}
@@ -803,9 +863,7 @@ function draw(now){
     for(let i=0;i<36;i++){const gx=252+(rnd()*20|0),gy=188+(rnd()*14|0),hh=4+(rnd()*4|0);
       if(i<n){P(lc,gx,gy-hh,i%3?'#d8b860':'#b8963e',1,hh);P(lc,gx,gy-hh,'#ecd48a');P(lc,gx,gy,'#7a6a3a')}else P(lc,gx,gy,'#7a6a3a',1,1)}
   }
-  if(S.prep.roof){for(let i=0;i<30;i++)P(lc,185+i,90,i%2?'#7b8186':'#a4aaae',1,4);P(lc,185,90,'#c4cace',30,1);P(lc,186,94,'#55554f',28,1)}
   if(S.prep.floor){seed=91;for(let i=0;i<120;i++){const x=173+(rnd()*52|0),y=110+(rnd()*18|0);P(lc,x,y,rnd()<.5?'#c8a85a':'#a88a40',2,1)}}
-  if(S.prep.door){P(lc,192,128,'#8a5040',16,6);P(lc,192,128,'#a35c4a',16,1);for(let x=192;x<208;x+=3)P(lc,x,129,'#5a3428',1,5);for(let x=193;x<208;x+=2)P(lc,x,134,'#8a5040')}
   if(S.storedWood){for(let i=0;i<3;i++){P(lc,172,110+i*3,'#5a3e26',9,2);P(lc,172,110+i*3,'#7a5a3a',9,1);P(lc,180,110+i*3,'#c8a070',1,2)}}
   drawDay(now);
   // fire
@@ -815,8 +873,6 @@ function draw(now){
     hs.forEach((h,i)=>{const hh=h+(rnd()*3|0)-1;for(let k=0;k<hh;k++){const f=k/hh;P(lc,cx-3+i,cy-1-k,f<.25?'#b8361e':f<.5?'#e05a22':f<.75?'#f29a30':f<.92?'#f8c850':'#fff0b0')}});
     for(let i=0;i<3;i++){const sy=((now/40+i*13)%18)|0;P(lc,cx-2+((i*5+(now/200|0))%6),cy-12-sy,'#ffd070')}
   }
-  // radio waves
-  if(S.radio>0&&Math.sin(now/300)>0){lc.fillStyle='#e0a458';px(lc,198,92);px(lc,199,93);px(lc,199,94);px(lc,198,95);px(lc,201,90);px(lc,202,92);px(lc,202,94);px(lc,201,96)}
   // placed memories, in the order they were placed
   S.placedOrder.forEach((id,i)=>{const s=SHELF[i];if(s)lc.drawImage(ICON[id],s[0],s[1])});
   // left-behind memories stay where they were
@@ -825,10 +881,10 @@ function draw(now){
   const p=S.p,walking=S._walk,fr=walking?[0,1,0,2][Math.floor(p.step)%4]:0;
   const ps=p.face>0?[H1,H2,H3][fr]:[H1L,H2L,H3L][fr];
   const bob=!walking&&Math.sin(now/600)>0.4?1:0;
-  for(const t of trees)if(t.y<=p.y)drawAt(t.c,t.x,t.y+10);
-  lc.fillStyle='rgba(8,10,6,.45)';lc.beginPath();lc.ellipse(L(p.x)+1,L(p.y)+11,6,2,0,0,7);lc.fill();
-  lc.drawImage(ps,Math.round(L(p.x)-7),Math.round(L(p.y)-10)+bob,14,22-bob);
-  for(const t of trees)if(t.y>p.y)drawAt(t.c,t.x,t.y+10);
+  const items=sortedItems();DAY_HOOKS.sprites.forEach(f=>f(items));
+  items.push({y:L(p.y)+11,f:()=>{lc.fillStyle='rgba(8,10,6,.45)';lc.beginPath();lc.ellipse(L(p.x)+1,L(p.y)+11,6,2,0,0,7);lc.fill();lc.drawImage(ps,Math.round(L(p.x)-7),Math.round(L(p.y)-10)+bob,14,22-bob)}});
+  items.sort((a,b)=>a.y-b.y).forEach(o=>o.f());
+  if(S.radio>0&&Math.sin(now/300)>0){lc.fillStyle='#e0a458';px(lc,191,86);px(lc,192,87);px(lc,192,88);px(lc,191,89);px(lc,194,84);px(lc,195,86);px(lc,195,88);px(lc,194,90)}
   // weather
   const st=stormLevel(),cl=cloudLevel();
   if(cl>0){lc.fillStyle=`rgba(40,46,60,${cl*.28})`;lc.fillRect(0,0,LW,LH)}
@@ -900,11 +956,11 @@ function draw(now){
   ctx.imageSmoothingEnabled=false;ctx.drawImage(low,0,0,W,H);
   // small labels at full resolution
   ctx.font='bold 11px system-ui,sans-serif';ctx.textAlign='center';
-  [['무너진 건물',150,22,150,100],['숲',150,330,150,400],['쉼터',400,174,400,240],['강',740,20,640,240]].forEach(([t,x,y,ax,ay])=>{if(fogAt(ax,ay)<10)return;ctx.fillStyle='rgba(0,0,0,.6)';ctx.fillText(t,x+1,y+1);ctx.fillStyle='rgba(232,228,218,.75)';ctx.fillText(t,x,y)});
+  [['무너진 건물',150,22,150,100],['숲',150,330,150,400],['쉼터',400,156,400,240],['강',740,20,640,240]].forEach(([t,x,y,ax,ay])=>{if(fogAt(ax,ay)<10)return;ctx.fillStyle='rgba(0,0,0,.6)';ctx.fillText(t,x+1,y+1);ctx.fillStyle='rgba(232,228,218,.75)';ctx.fillText(t,x,y)});
 }
 
 // ---------- day system: hooks every later day plugs into ----------
-const DAY_HOOKS={actions:[],tick:[],draw:[],global:[],gather:null};
+const DAY_HOOKS={actions:[],tick:[],draw:[],global:[],sprites:[],gather:null};
 const MONO={},ON_START={},PRESET={};
 const INV_EXTRA=[];
 function globalDayActions(){const a=[];DAY_HOOKS.global.forEach(f=>f(a));return a}
@@ -997,12 +1053,6 @@ MONO[3]=()=>{
 DAY_HOOKS.tick.push(m=>{if(S.day===3&&S.inv.bw==='boiled')once('d3boil')});
 DAY_HOOKS.draw.push(now=>{
   if(S.day<3)return;
-  // birch in the deep forest
-  const bx=18,by=159;
-  P(lc,bx-2,by-14,'#e8e2d2',4,16);P(lc,bx+1,by-14,'#bdb6a6',1,16);
-  [[0,-12],[-1,-8],[1,-5],[-1,-2],[0,0]].forEach(([x,y])=>P(lc,bx+x-1,by+y,'#2a2620',2,1));
-  if((S.barkLeft||0)<3)P(lc,bx-2,by-6,'#c8a070',3,3-(S.barkLeft||0));
-  blobShade(lc,bx,by-20,[[0,0,8],[-5,2,5],[5,2,5],[0,-4,5]],['#3a5a26','#4a6e30','#5a823a','#6e9a48','#86b05a'],'#1e3216');
   // old campfire ring
   const fx=29,fy=234;for(let i=0;i<8;i++){const a=i/8*Math.PI*2;P(lc,fx+Math.cos(a)*5,fy+Math.sin(a)*3,'#6e6a62',2,1)}P(lc,fx-2,fy-1,'#4a4844',4,2);P(lc,fx-1,fy,'#2a2826',2,1);
   // gravel bar on the upper riverbank
@@ -1151,14 +1201,7 @@ MONO[5]=()=>{
 };
 DAY_HOOKS.draw.push(now=>{
   if(S.day<5)return;
-  // ruined pharmacy on the far west edge
   const x=10,y=114;
-  P(lc,x+2,y+3,'rgba(8,10,6,.4)',28,16);
-  for(let yy=0;yy<16;yy++)for(let xx=0;xx<26;xx++){if(yy<4&&xx>10+yy*2)continue;const v=(176+((xx*7+yy*13)%9)-(yy>12?24:0))|0;P(lc,x+xx,y+yy,`rgb(${v},${v-8},${v-16})`)}
-  P(lc,x+4,y+6,'#2a2622',6,10);P(lc,x+14,y+7,'#3a4a52',7,5);P(lc,x+15,y+8,'#6a8a96',2,2);
-  P(lc,x+2,y-6,'#e8e8e0',7,7);P(lc,x+4,y-5,'#3aa060',3,5);P(lc,x+3,y-4,'#3aa060',5,3);
-  // graffiti strokes
-  [[11,2],[13,3],[16,2],[19,3],[22,2]].forEach(([dx,dy])=>P(lc,x+dx,y+dy+4,'#e8e8e0',2,1));
   seed=606;for(let i=0;i<20;i++)P(lc,x+rnd()*30,y+16+rnd()*6,rnd()<.5?'#8a867c':'#6e6a62');
   // blood drops while bleeding
   if(S.wound==='bleed'&&S._walk&&Math.floor(now/400)%3===0)P(lc,L(S.p.x)+2,L(S.p.y)+12,'#8a1e1e');
