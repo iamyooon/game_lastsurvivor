@@ -82,6 +82,12 @@
   .card .small{color:var(--dim);font-size:12px}
   .card .btns{display:flex;gap:8px;flex-wrap:wrap;margin-top:6px}
   .card .shelf{text-align:center;margin:4px 0 8px}
+  .charlist{display:grid;grid-template-columns:repeat(5,1fr);gap:6px;margin:0 0 6px}
+  .charlist button{display:flex;flex-direction:column;align-items:center;gap:3px;padding:6px 2px;background:#2a2630;box-shadow:inset -2px -2px 0 #1a171e,inset 2px 2px 0 #3c3644}
+  .charlist button img{image-rendering:pixelated;width:42px;height:66px}
+  .charlist button span{font-size:12px;display:flex;flex-direction:column;align-items:center;line-height:1.2}
+  .charlist button small{color:var(--dim);font-size:10px}
+  .charlist button.on{background:#4a3a26;box-shadow:inset -2px -2px 0 #2e2416,inset 2px 2px 0 #6e5638;outline:2px solid var(--accent)}
   .daylist{display:grid;gap:6px;margin:10px 0 6px}
   .daylist button{display:flex;justify-content:space-between;align-items:center;text-align:left;width:100%}
   .daylist button .d{font-family:"Press Start 2P",monospace;font-size:9px;color:var(--accent);margin-right:10px}
@@ -602,6 +608,25 @@ const HERO_B=HERO_TOP.concat(['...otttTtto...','....ottoTto...','...otto..tto..'
 const HERO_C=HERO_TOP.concat(['...otttTtto...','...ottTo.to...','..otto...tto..','.okko....kko..','.oooo....ooo..']);
 const H1=sprite(HERO_A,PL),H2=sprite(HERO_B,PL),H3=sprite(HERO_C,PL);
 const H1L=flipped(H1),H2L=flipped(H2),H3L=flipped(H3);
+// --- selectable characters (14x22). Bodies share the walking legs; each has its own head and clothes ---
+const LEGS_A=['...otttTtto...','...otttoTto...','...ottto.tto..','..okkko..kko..','..ooooo..ooo..'];
+const LEGS_B=['...otttTtto...','....ottoTto...','...otto..tto..','..okko...okko.','..oooo...oooo.'];
+const LEGS_C=['...otttTtto...','...ottTo.to...','..otto...tto..','.okko....kko..','.oooo....ooo..'];
+const CHARS=[
+  {id:'sua',name:'수아',sub:'기본',top:HERO_TOP,pal:PL},
+  {id:'dad',name:'아빠',top:['....ooooo.....','...ohhhhho....','..ohhhhhhho...','..ohhhhhhHo...','..ohhsssssSo..','..oHssgegSSo..','...osssssSo...','...oosSSoo....','..obbbbbbBo...','.oqbbbbbbBBo..','opqbwwwwbbBo..','opqbbbbbbBBo..','opqbwwwbbBBo..','opqbbbbbbBBo..','.oqbbbbbbBBo..','..obbbbbbbBo..','..oBbbbbbBBo..'],
+   pal:{o:'#1c1714',h:'#1e1c22',H:'#3a3842',s:'#e8c4a0',S:'#c99c78',e:'#1e1a16',g:'#b08a50',b:'#2a2a2e',B:'#1c1c20',w:'#e8e8e0',p:'#4a3d30',q:'#33291f',t:'#2e3440',T:'#22262e',k:'#1a1a1e'}},
+  {id:'mom',name:'엄마',top:['....ooooo.....','...ohhhhho....','..ohhhHhhho...','..ohhhhhhhho..','.ohhhsssssho..','.ohhsssesSho..','.ohhssssSSho..','.ohhosSSohho..','.ohhmmmmmmhho.','.oqhmmmmmmMho.','opqmmymmmmMo..','opqmmmymmmMo..','opqmmmmmmMMo..','opqmmmmmmMMo..','.oqmmmmmmMMo..','..ommmmmmmMo..','..oMmmmmmMMo..'],
+   pal:{o:'#1c1714',h:'#1e1c22',H:'#4a4652',s:'#ecc8a6',S:'#cba07c',e:'#1e1a16',m:'#a8dcc8',M:'#7fbfa8',y:'#e8d8a0',p:'#4a3d30',q:'#33291f',t:'#3a3a44',T:'#2a2a32',k:'#1e1c22'}},
+  {id:'son',name:'아들',top:['...oooooo.....','..ohhhhhho....','..ohhhhhhHo...','..ohhhhhhHo...','..ohssssssSo..','.osssgvgssSo..','.osssssssSSo..','..osssssSSo...','...oossSoo....','..onnnnnnno...','.opcrcCcclCo..','opqclrlcCclo..','opqcClrcclCo..','opqlccCrcCCo..','.oqcCccCrcCo..','..olccClcrCo..','..oCcllcCCro..'],
+   pal:{o:'#1c1714',h:'#1e1c22',H:'#3a3842',s:'#ecc6a0',S:'#cc9e78',e:'#1e1a16',g:'#c8c8d0',v:'#9a80d0',n:'#1e1e24',c:'#5a8ac8',C:'#3a62a8',l:'#b8d4f0',r:'#c83a3a',p:'#4a3d30',q:'#33291f',t:'#2e3440',T:'#22262e',k:'#2a2a30'}},
+  {id:'dau',name:'딸',top:['.....oo.......','....ohho......','...owwwo......','...ohhhhho....','..ohhhhhhho...','..ohhhhhhHo...','..oHhhsssSo...','..oHssgegSo...','..oHssssSSo...','...oosSSoo....','..obbbbbbBo...','.oqbbbbbbBBo..','opqbbbbbbbBo..','opqbbbbbbBBo..','opqbbbbbbBBo..','.oqbbbbbbBBo..','..obbbbbbbBo..'],
+   pal:{o:'#1c1714',h:'#1e1c22',H:'#3a3842',w:'#f0ece0',s:'#eec8a4',S:'#cea07a',e:'#1e1a16',g:'#d8dce4',b:'#2a2a30',B:'#1c1c22',p:'#4a3d30',q:'#33291f',t:'#2a2a30',T:'#1e1e24',k:'#c83a3a'}},
+];
+CHARS.forEach(c=>{const f=[LEGS_A,LEGS_B,LEGS_C].map(L2=>sprite(c.top.concat(L2),c.pal));c.f=f;c.fl=f.map(flipped);c.url=dataURL(f[0])});
+let CHAR=(()=>{try{return localStorage.getItem('ls_char')||'sua'}catch(e){return 'sua'}})();
+const charSet=()=>CHARS.find(c=>c.id===CHAR)||CHARS[0];
+
 
 // --- item icons (7x7) ---
 const ICON={
@@ -919,7 +944,7 @@ function draw(now){
   lc.globalAlpha=.65;for(const f of FINDS){if(S.found[f.id]==='left')lc.drawImage(ICON[f.id],Math.round(L(f.x))-3,Math.round(L(f.y))-3)}lc.globalAlpha=1;
   // trees / hero depth-sorted
   const p=S.p,walking=S._walk,fr=walking?[0,1,0,2][Math.floor(p.step)%4]:0;
-  const ps=p.face>0?[H1,H2,H3][fr]:[H1L,H2L,H3L][fr];
+  const cs=charSet(),ps=(p.face>0?cs.f:cs.fl)[fr];
   const bob=!walking&&Math.sin(now/600)>0.4?1:0;
   const items=sortedItems();DAY_HOOKS.sprites.forEach(f=>f(items));
   items.push({y:L(p.y)+11,f:()=>{lc.fillStyle='rgba(8,10,6,.45)';lc.beginPath();lc.ellipse(L(p.x)+1,L(p.y)+11,6,2,0,0,7);lc.fill();lc.drawImage(ps,Math.round(L(p.x)-7),Math.round(L(p.y)-10)+bob,14,22-bob)}});
@@ -1824,9 +1849,12 @@ function showTitle(fromGame){
   if(inGame)S.running=false;
   card.innerHTML=`<h2>마지막 사람</h2><div class="sub">멸망 후 50년 · 하루에 하나씩 배우는 생존</div>
   <p class="small">날짜를 골라 시작하세요. 1일차부터 하면 전날의 상태가 다음 날로 이어집니다.<br>중간 날짜부터 고르면 '전날을 무난히 보낸' 상태로 시작해요.</p>
+  <div class="small" style="margin:4px 0 4px">누구로 살아남을까?</div>
+  <div class="charlist">${CHARS.map(c=>`<button data-c="${c.id}" class="${c.id===CHAR?'on':''}"><img src="${c.url}" width="42" height="66" alt=""><span>${c.name}${c.sub?`<small>${c.sub}</small>`:''}</span></button>`).join('')}</div>
   <div class="daylist">${WEEK.map(w=>`<button ${w.ready?'':'disabled'} data-d="${w.d}" class="${w.ready?'':'ghost'}"><span><span class="d">${w.d}일차</span>${w.theme}</span><span class="sk">${w.ready?w.skill:'준비 중'}</span></button>`).join('')}</div>
   ${inGame?`<div class="btns"><button id="resume" class="ghost">← 하던 날 계속하기</button></div>`:''}`;
   ov.classList.remove('hide');
+  card.querySelectorAll('.charlist button').forEach(b=>{b.onclick=()=>{CHAR=b.dataset.c;try{localStorage.setItem('ls_char',CHAR)}catch(e){}Sfx.play('pick');card.querySelectorAll('.charlist button').forEach(x=>x.classList.toggle('on',x===b))}});
   card.querySelectorAll('.daylist button[data-d]').forEach(b=>{b.onclick=()=>{const n=+b.dataset.d;Sfx.play('pick');if(n===1)startDay(1);else{presetFor(n);startDay(n)}}});
   const r=document.getElementById('resume');if(r)r.onclick=()=>{ov.classList.add('hide');S.running=true;dirtyUI=true};
 }
