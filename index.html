@@ -159,7 +159,7 @@ FINDS.push(
   {id:'newspaper',day:2,at:17*60,x:452,y:318,kind:'mem',name:'날아온 신문 조각',
    text:'폭풍에 날려 와 쉼터 앞에 들러붙은 신문 조각. 젖어서 글자가 반쯤 지워졌다.\n\n「…북부 대피소 수용 인원 초과… 도착하지 못한 시민은 각 지역 임시 거처에서 구조를 기다리…」\n\n날짜는 그날의 다음 날이다.'}
 );
-const visible=f=>(f.day||1)<=S.day&&(!f.at||S.t>=f.at);
+const visible=f=>(f.day||1)<=S.day&&(!f.only||f.only.includes(S.day))&&(!f.at||S.t>=f.at);
 const memTotal=()=>FINDS.filter(f=>f.kind==='mem'&&(f.day||1)<=S.day).length;
 
 // ---------- state ----------
@@ -198,7 +198,7 @@ function nearPOI(){
   for(const f of FINDS){if(!S.found[f.id]&&visible(f)&&Math.hypot(p.x-f.x,p.y-f.y)<34)return{id:'find',find:f,name:'무언가 있다'}}
   if(p.x>628)return POI.find(o=>o.id==='river');
   let best=null,bd=1e9;
-  for(const o of POI){if(o.id==='river'||(o.day||1)>S.day)continue;const d=Math.hypot(p.x-o.x,p.y-o.y);if(d<o.r&&d<bd){bd=d;best=o}}
+  for(const o of POI){if(o.id==='river'||(o.day||1)>S.day||(o.only&&!o.only.includes(S.day)))continue;const d=Math.hypot(p.x-o.x,p.y-o.y);if(d<o.r&&d<bd){bd=d;best=o}}
   return best;
 }
 const inShelter=()=>S.p.x>338&&S.p.x<462&&S.p.y>184&&S.p.y<268;
@@ -235,6 +235,7 @@ function actionsFor(o){
       break;
     case 'fire':
       if(!S.fire&&stormLevel()>.1)a.push({label:'불 피우기',cost:0,ok:false,why:'비가 퍼붓는다',fn:()=>{}});
+      else if(!S.fire&&S.day>=3)fireBuildActions(a);
       else if(!S.fire){
         if(I.lighter)a.push({label:'라이터로 불 피우기 (땔감 2)',cost:10,ok:I.wood>=2,why:'땔감이 부족하다',fn:lightFire});
         else a.push({label:'나무 비벼 불 피우기 (땔감 2)',cost:60,ok:I.wood>=2,why:'땔감이 부족하다',fn:()=>{S.mind=Math.max(0,S.mind-3);lightFire();log('한 시간을 비벼서야 연기가 났다. 손바닥이 얼얼하다. (정신력 -3)')}});
@@ -260,9 +261,11 @@ function actionsFor(o){
       a.push({label:'쉬며 기다리기 (1시간)',cost:60,ok:S.t<29*60,why:'곧 날이 밝는다',fn:()=>{emote('zz',2500);S.mind=Math.min(100,S.mind+2);log(stormLevel()>.2?'빗소리를 들으며 한 시간쯤 누워 있었다.':S.t>=19*60?'어둠 속에 누워 한 시간쯤 숨을 골랐다.':'잠자리에 누워 한 시간쯤 쉬었다. 천장 틈으로 빛이 움직인다.')}});
       break;
   }
+  DAY_HOOKS.actions.forEach(f=>f(o,a));
   return a;
 }
 function gather(){
+  if(S.day>=3&&DAY_HOOKS.gather){DAY_HOOKS.gather();return}
   S.forest++;S.inv.wood++;
   log(S.forest===1?'바닥에 떨어진 마른 가지를 모았다. (땔감 +1)':S.forest===2?'부러진 가지를 한 아름 더 주웠다. (땔감 +1)':'마른 가지를 모았다. (땔감 +1)');
 }
@@ -321,7 +324,7 @@ function placeCarried(){
   for(const id of S.carry){
     S.found[id]='placed';S.placedOrder.push(id);S.mind=Math.min(100,S.mind+4);
     const f=FINDS.find(x=>x.id===id);
-    const where={umbrella:'벽에 기대어 펼쳐',newspaper:'선반 위에 펴서',shoe:'문가에',letter:'선반 위에',sign:'벽에 기대어',watch:'벽에 걸어',drawing:'잠자리 옆에',musicbox:'머리맡에'}[id];
+    const where=({umbrella:'벽에 기대어 펼쳐',newspaper:'선반 위에 펴서',shoe:'문가에',letter:'선반 위에',sign:'벽에 기대어',watch:'벽에 걸어',drawing:'잠자리 옆에',musicbox:'머리맡에'})[id]||'선반 위에';
     log(`${f.name}을(를) ${where} 두었다. 쉼터가 조금 덜 비어 보인다. (정신력 +4)`);
   }
   S.carry=[];dirtyUI=true;emote('♥');
@@ -342,6 +345,7 @@ function advance(m){
     if(h>=15.5&&say('d','빗물통에 빗물이 차오르는 소리가 들린다.'))S.barrelFull=true;
     if(h>=16)say('e','폭풍이다. 바람이 쉼터를 통째로 흔든다.');
   }
+  DAY_HOOKS.tick.forEach(f=>f(m));
   if(S.day>=2){
     const st=stormLevel(),inside=inShelter();let loss=0,gain=0;
     if(st>0&&!inside){loss+=.35*st;if(!S.wet&&st>.2){S.wet=true;S.wasWet=true;emote('drop');log('비에 흠뻑 젖었다. 몸이 빠르게 식는다.')}}
@@ -399,6 +403,7 @@ function monologue2(){
 }
 function monologue(){
   if(S.day===2)return monologue2();
+  if(MONO[S.day])return MONO[S.day]();
   const I=S.inv,mem=FINDS.filter(f=>f.kind==='mem'&&S.found[f.id]).length;
   let s;
   if(S.t>=18*60)s=S.t>=20*60?'밤이다. 더 둘러봐도 되고, 쉼터에 누워 하루를 마쳐도 된다.':'해가 기운다. 어두워지기 전에 쉼터 쪽으로 돌아가자.';
@@ -486,10 +491,11 @@ function renderUI(){
   if(I.metal)items.push(iconImg('metal',14)+' 함석판 ×'+I.metal);
   if(I.grass)items.push(iconImg('grass',14)+' 마른 풀 ×'+I.grass);
   if(I.blanket)items.push(iconImg('blanket',14)+' 담요');
+  INV_EXTRA.forEach(([k,lab])=>{const v=I[k];if(v)items.push(iconImg(k,14)+' '+lab+(v>1?' ×'+v:''))});
   if(S.sick)items.push('⚠ 배탈');
   if(S.wet)items.push('💧 젖음');
   invEl.innerHTML=items.length?items.map(t=>`<span class="item">${t}</span>`).join(''):'<span style="color:var(--dim)">비어 있음</span>';
-  const o=nearPOI();currentActions=actionsFor(o).concat(drinkActions());
+  const o=nearPOI();currentActions=actionsFor(o).concat(drinkActions()).concat(globalDayActions());
   if(I.can)currentActions.push({label:'통조림 먹기',cost:10,ok:true,fn:()=>{emote('♥');S.inv.can--;S.ateCan++;S.food=Math.min(100,S.food+30);log('칼로 통조림을 땄다. 정체 모를 콩 요리. 맛은 상관없다. (식량 +30)')}});
   const key=(o?(o.id+(o.find?o.find.id:'')):'')+'|'+currentActions.map(a=>a.label+a.ok).join(',')+'|'+I.can;
   if(key!==lastActKey||dirtyUI){
@@ -800,6 +806,7 @@ function draw(now){
   if(S.prep.floor){seed=91;for(let i=0;i<120;i++){const x=173+(rnd()*52|0),y=110+(rnd()*18|0);P(lc,x,y,rnd()<.5?'#c8a85a':'#a88a40',2,1)}}
   if(S.prep.door){P(lc,192,128,'#8a5040',16,6);P(lc,192,128,'#a35c4a',16,1);for(let x=192;x<208;x+=3)P(lc,x,129,'#5a3428',1,5);for(let x=193;x<208;x+=2)P(lc,x,134,'#8a5040')}
   if(S.storedWood){for(let i=0;i<3;i++){P(lc,172,110+i*3,'#5a3e26',9,2);P(lc,172,110+i*3,'#7a5a3a',9,1);P(lc,180,110+i*3,'#c8a070',1,2)}}
+  drawDay(now);
   // fire
   if(S.fire){const cx=200,cy=172;
     const gr=lc.createRadialGradient(cx,cy-3,0,cx,cy-3,26);gr.addColorStop(0,`rgba(255,170,70,${.26+.04*Math.sin(now/90)})`);gr.addColorStop(1,'rgba(255,140,40,0)');lc.fillStyle=gr;lc.fillRect(cx-28,cy-30,56,56);
@@ -895,6 +902,115 @@ function draw(now){
   [['무너진 건물',150,22,150,100],['숲',150,330,150,400],['쉼터',400,174,400,240],['강',740,20,640,240]].forEach(([t,x,y,ax,ay])=>{if(fogAt(ax,ay)<10)return;ctx.fillStyle='rgba(0,0,0,.6)';ctx.fillText(t,x+1,y+1);ctx.fillStyle='rgba(232,228,218,.75)';ctx.fillText(t,x,y)});
 }
 
+// ---------- day system: hooks every later day plugs into ----------
+const DAY_HOOKS={actions:[],tick:[],draw:[],global:[],gather:null};
+const MONO={},ON_START={},PRESET={};
+const INV_EXTRA=[];
+function globalDayActions(){const a=[];DAY_HOOKS.global.forEach(f=>f(a));return a}
+function drawDay(now){DAY_HOOKS.draw.forEach(f=>f(now))}
+function addIcons(defs){for(const k in defs){ICON[k]=sprite(defs[k][0],defs[k][1]);ICONURL[k]=dataURL(ICON[k])}}
+const ck=v=>v?'✓':'✗';
+const clamp100=v=>Math.max(0,Math.min(100,v));
+// only on a given day or later: {day:3}; only on listed days: {only:[3]}
+function addPOI(p){POI.push(p)}
+// a simple once-per-key log so day events fire one time
+function once(key,fn){S.flags=S.flags||{};if(S.flags[key])return false;S.flags[key]=1;fn&&fn();return true}
+
+// fire built the long way (day 3) or quickly once learned (day 4+)
+function fireBuildActions(a){
+  const I=S.inv;S.fb=S.fb||{};
+  const kit=I.flint&&I.steel,tinder=(I.bark||0)>0||(I.grass||0)>0;
+  if(S.day>=4&&S.fireSkill){
+    a.push({label:'불 피우기 (불쏘시개·잔가지·장작)',cost:20,ok:kit&&tinder&&(I.twig||0)>=1&&I.wood>=1,
+      why:!kit?'부싯돌과 쇳조각이 필요하다':!tinder?'불쏘시개가 없다':(I.twig||0)<1?'잔가지가 없다':'마른 장작이 없다',
+      fn:()=>{if(I.bark)I.bark--;else I.grass--;I.twig--;I.wood--;S.fire=true;S.mind=clamp100(S.mind+6);emote('♥');log('껍질에 불꽃을 받아 잔가지로 키우고, 장작을 올렸다. 이제 손에 익었다.')}});
+    return;
+  }
+  if(!S.fb.t)a.push({label:'불쏘시개 놓기',cost:5,ok:tinder,why:'자작나무 껍질이나 마른 풀이 필요하다',fn:()=>{if(I.bark)I.bark--;else I.grass--;S.fb.t=true;log('돌 사이 한가운데에 불쏘시개를 보슬보슬하게 펼쳐 놓았다.')}});
+  if(!S.fb.k)a.push({label:'잔가지 원뿔로 세우기 (2)',cost:10,ok:(I.twig||0)>=2,why:'잔가지가 2개 필요하다',fn:()=>{I.twig-=2;S.fb.k=true;log(S.fb.t?'불쏘시개 위로 잔가지를 원뿔 모양으로 기대어 세웠다. 바람이 드나들 틈을 남겼다.':'잔가지를 원뿔 모양으로 세웠다. 그런데 안에 불을 받을 게 없다.')}});
+  a.push({label:'부싯돌로 불꽃 튀기기',cost:10,ok:!!kit,why:!I.flint&&!I.steel?'부싯돌과 쇳조각이 필요하다':!I.flint?'부싯돌이 없다':'부딪칠 쇳조각이 없다',fn:()=>{
+    if(!S.fb.t){log('불꽃이 튀었지만 받아 줄 불쏘시개가 없다.');emote('?');return}
+    if(!S.fb.k){S.fb.t=false;log('불쏘시개만 확 타오르고 금세 꺼졌다. 잔가지를 먼저 세워 둘 걸.');emote('…');return}
+    S.fire=true;S.fireWeak=S.t;S.fb={};emote('!');log('불꽃이 껍질에 옮겨붙었다! 잔가지로 번진다. 어서 장작을 올려야 한다.')}});
+}
+DAY_HOOKS.actions.push((o,a)=>{
+  if(!o||o.id!=='fire'||!S.fire||!S.fireWeak)return;
+  const I=S.inv;
+  a.unshift({label:'마른 장작 올리기',cost:5,ok:I.wood>=1,why:(I.wetwood||0)>0?'젖은 장작밖에 없다':'마른 장작이 없다',fn:()=>{I.wood--;S.fireWeak=null;S.fireSkill=true;S.mind=clamp100(S.mind+8);emote('♥');log('장작에 불이 옮겨붙어 타닥타닥 자리를 잡았다. 해냈다.')}});
+  if((I.wetwood||0)>0)a.push({label:'젖은 장작 올리기',cost:5,ok:true,fn:()=>{I.wetwood--;S.fire=false;S.fireWeak=null;emote('sweat');log('흰 연기만 피어오르더니 불이 죽어 버렸다. 젖은 나무는 안 된다.')}});
+});
+DAY_HOOKS.tick.push(m=>{if(S.fire&&S.fireWeak&&S.t-S.fireWeak>40){S.fire=false;S.fireWeak=null;emote('…');log('장작을 올리지 못해 불이 사그라들었다. 처음부터 다시.')}});
+// ===== DAY 3 · 불씨가 꺼졌다 (불 피우기) =====
+addIcons({
+  bark:[['.......','wwwwwww','wkwwkww','wwwwwww','wwkwwkw','wwwwwww','.......'],{w:'#ece6d6',k:'#3a3530'}],
+  twig:[['......t','.....t.','..t.t..','...t...','..t.t..','.t.....','t......'],{t:'#8a6a44'}],
+  wetwood:[['.....b.','....bbb','..tt.b.','.ttt...','tttt...','ttt....','.......'],{t:'#5a4630',b:'#4a90d0'}],
+  flint:[['.......','..ddd..','.dkkdd.','dkkkkdd','.dkkkd.','..ddd.y','......y'],{d:'#3a3a40',k:'#56565e',y:'#f8d050'}],
+  steel:[['.......','......m','.....mM','....mM.','...mM..','.wwM...','ww.....'],{m:'#b8b8b0',M:'#7a7a74',w:'#6a4a2c'}],
+  burntphoto:[['kppppp.','kpbbbp.','kpbybp.','kpbbbpk','kppppkk','kkpkkk.','..kk...'],{p:'#e8e0cc',b:'#7a8aa0',y:'#e8c840',k:'#2a2420'}],
+});
+INV_EXTRA.push(['bark','자작나무 껍질'],['twig','잔가지'],['wetwood','젖은 장작'],['flint','부싯돌'],['steel','쇳조각']);
+addPOI({id:'birch',day:3,x:36,y:318,r:28,name:'자작나무'});
+addPOI({id:'gravel',day:3,x:628,y:70,r:30,name:'강 위쪽 자갈밭'});
+FINDS.push({id:'burntphoto',day:3,x:58,y:468,kind:'mem',name:'타다 남은 사진',
+  text:'오래된 모닥불 자리, 재 속에서 반쯤 탄 사진을 찾았다.\n정류장 앞, 노란 우산을 든 아이와 키 큰 남자.\n뒷면에 볼펜으로 「수아 입학식」.\n\n누군가 여기서 불을 피웠었다. 그날 이후에.'});
+
+ON_START[3]=()=>{
+  const I=S.inv;
+  if(I.lighter){I.lighter=false;S.lighterEmpty=true}
+  I.wood=(I.wood||0)+S.storedWood;S.storedWood=0;
+  S.barkLeft=3;S.fb={};S.fireWeak=null;
+};
+PRESET[3]=()=>{
+  Object.assign(S.prep,{roof:true,floor:true,door:true});S.storedWood=2;S.metalLeft=0;S.grassLeft=0;S.blanketTaken=true;
+  S.car=2;S.inv.lighter=true;S.notes=[1,2];
+  [[420,80],[520,388],[205,70]].forEach(([x,y])=>revealOn(S.fog,x,y,12));
+};
+DAY_HOOKS.gather=()=>{
+  S.forest++;
+  if(S.day===3){S.inv.wetwood=(S.inv.wetwood||0)+1;log('어제 폭풍에 가지가 다 젖었다. 젖은 장작이라도 주웠다. (젖은 장작 +1)')}
+  else{S.inv.wood++;log('마른 가지를 모았다. (장작 +1)')}
+};
+DAY_HOOKS.actions.push((o,a)=>{
+  if(!o||S.day<3)return;const I=S.inv;
+  if(o.id==='forest')a.push({label:'잔가지 줍기',cost:15,ok:true,fn:()=>{I.twig=(I.twig||0)+2;log('손가락 굵기의 잔가지를 한 줌 모았다. (잔가지 +2)')}});
+  if(o.id==='birch')a.push({label:'자작나무 껍질 벗기기',cost:15,ok:(S.barkLeft||0)>0,why:'오늘은 더 벗길 데가 없다',fn:()=>{S.barkLeft--;I.bark=(I.bark||0)+1;log('하얀 껍질을 얇게 벗겨 냈다. 젖어 있어도 기름기가 있어 불이 잘 붙는다고 했다. (껍질 +1)')}});
+  if(o.id==='gravel')a.push({label:'부싯돌 고르기',cost:20,ok:!I.flint,why:'이미 하나 골랐다',fn:()=>{I.flint=1;emote('!');log('자갈 사이에서 유리처럼 깨진 단단한 돌을 골랐다. 쇠에 그으면 불꽃이 튈 것이다. (부싯돌)')}});
+  if(o.id==='car'&&!I.steel)a.push({label:'공구함 뒤지기',cost:15,ok:true,fn:()=>{I.steel=1;emote('!');log('트렁크 바닥 공구함에서 녹슨 줄칼을 찾았다. 부싯돌과 부딪치면 되겠다. (쇳조각)')}});
+  if(o.id==='shelter'&&(I.wetwood||0)>0)a.push({label:'젖은 장작 속 깎기',cost:20,ok:true,fn:()=>{I.wetwood--;I.wood++;log('젖은 겉껍질을 깎아 내니 속은 말라 있었다. (마른 장작 +1)')}});
+});
+MONO[3]=()=>{
+  const I=S.inv;let s;
+  const kit=I.flint&&I.steel,tinder=(I.bark||0)>0||(I.grass||0)>0||S.fb&&S.fb.t;
+  if(S.fire&&S.fireWeak)s='불이 약하다. 어서 마른 장작을 올려야 한다!';
+  else if(S.fire)s=S.t>=19*60?'불이 탄다. 오늘은 이 불 곁에서 잠들자.':(!S.flags||!S.flags.d3boil)?'불이 탄다. 이 불로 물을 끓이자. 꺼뜨리지 말아야 한다.':'불이 잘 탄다. 남은 시간엔 주변을 더 둘러봐도 좋겠다.';
+  else if(!kit)s=`라이터 가스가 떨어졌다. 불꽃을 낼 것이 필요하다. ${!I.flint?'강 위쪽 자갈밭엔 부싯돌이 있을지도. ':''}${!I.steel?'차 트렁크 공구함엔 쇳조각이 있을지도.':''}`;
+  else if(!tinder)s='불꽃을 받아 줄 불쏘시개가 필요하다. 숲 깊은 곳 자작나무 껍질이 잘 탄다던데.';
+  else if(!(S.fb&&S.fb.k)&&(I.twig||0)<2)s='잔가지를 모으자. 불쏘시개 → 잔가지 → 장작, 작은 것부터 키운다.';
+  else if(I.wood<1)s=(I.wetwood||0)>0?'장작이 다 젖었다. 쉼터 안에서 젖은 장작의 속을 깎아 내자.':'장작이 필요하다. 숲에서 가지를 주워 오자.';
+  else s='준비는 됐다. 모닥불 자리에서 차례대로: 불쏘시개, 잔가지, 그리고 불꽃.';
+  if(S.carry.length&&S.t<18*60)s+=' 배낭 속 물건은 쉼터에 가져다 두자.';
+  const fb=S.fb||{};
+  return {s,count:`불 — 불꽃 ${ck(kit)} · 불쏘시개 ${ck(tinder||S.fire)} · 잔가지 ${ck(fb.k||(I.twig||0)>=2||S.fire)} · 장작 ${ck(S.fire&&!S.fireWeak)}`};
+};
+DAY_HOOKS.tick.push(m=>{if(S.day===3&&S.inv.bw==='boiled')once('d3boil')});
+DAY_HOOKS.draw.push(now=>{
+  if(S.day<3)return;
+  // birch in the deep forest
+  const bx=18,by=159;
+  P(lc,bx-2,by-14,'#e8e2d2',4,16);P(lc,bx+1,by-14,'#bdb6a6',1,16);
+  [[0,-12],[-1,-8],[1,-5],[-1,-2],[0,0]].forEach(([x,y])=>P(lc,bx+x-1,by+y,'#2a2620',2,1));
+  if((S.barkLeft||0)<3)P(lc,bx-2,by-6,'#c8a070',3,3-(S.barkLeft||0));
+  blobShade(lc,bx,by-20,[[0,0,8],[-5,2,5],[5,2,5],[0,-4,5]],['#3a5a26','#4a6e30','#5a823a','#6e9a48','#86b05a'],'#1e3216');
+  // old campfire ring
+  const fx=29,fy=234;for(let i=0;i<8;i++){const a=i/8*Math.PI*2;P(lc,fx+Math.cos(a)*5,fy+Math.sin(a)*3,'#6e6a62',2,1)}P(lc,fx-2,fy-1,'#4a4844',4,2);P(lc,fx-1,fy,'#2a2826',2,1);
+  // gravel bar on the upper riverbank
+  seed=303;for(let i=0;i<70;i++){const x=306+rnd()*24,y=26+rnd()*20;P(lc,x,y,rnd()<.5?'#8a867c':rnd()<.5?'#a8a49a':'#5e5a54',rnd()<.3?2:1,1)}
+  if(!S.inv.flint&&Math.floor(now/500)%3===0)P(lc,318,34,'#f8f0d0');
+  // smoke from a dying fire
+  if(S.fire&&S.fireWeak){for(let i=0;i<4;i++){const t=((now/30+i*20)%60)/60;P(lc,198+Math.sin(t*6+i)*3,166-t*20,`rgba(220,220,220,${.5*(1-t)})`,2,2)}}
+});
+// @@DAY_WORLD@@
 // ---------- loop ----------
 let last=performance.now();
 function frame(now){
@@ -1090,6 +1206,7 @@ function startDay(n){
     S.water=Math.max(15,S.water-12);S.food=Math.max(15,S.food-10);S.hp=Math.min(100,S.hp+10);S.mind=Math.max(20,S.mind);
     S.sick=false;S.fire=false;S.bush=0;S.rock=false;S.barrel=true;S.barrelFull=false;
     S.warm=80;S.wet=false;S.p={x:400,y:236,face:1,step:0};S.target=null;S.carry.forEach(id=>{S.found[id]='placed';S.placedOrder.push(id)});S.carry=[];
+    (ON_START[n]||(()=>{}))();
   }
   dayStart=JSON.stringify(S,(k,v)=>(k==='_pctT'||k==='emote')?undefined:v);
   beginDay();
@@ -1149,13 +1266,14 @@ function endDay(forced){
   S.ended=true;S.running=false;Sfx.play('night');
   const home=inShelter();
   if(forced&&!home){S.mind=Math.max(0,S.mind-8)}
-  const L=S.day===1?journal1(forced,home):journal2(forced,home);
+  const L=(JOURNAL[S.day]||journal2)(forced,home);
   const N=NOTES[S.day];if(!S.notes.includes(S.day))S.notes.push(S.day);
   const placed=S.placedOrder.map(id=>FINDS.find(f=>f.id===id));
   const memCount=FINDS.filter(f=>f.kind==='mem'&&S.found[f.id]&&(f.day||1)<=S.day).length;
-  const next=S.day===1
-    ?`<p class="small">내일의 주제 — <b style="color:var(--accent)">2일차: 폭풍이 온다</b></p><div class="btns"><button id="next">2일차로 넘어가기</button><button id="again" class="ghost">1일차 다시 걷기</button><button id="pick" class="ghost">날짜 선택</button></div>`
-    :`<p class="small">내일의 주제 — <b style="color:var(--accent)">3일차: 불씨가 꺼졌다</b> (아직 준비 중)</p><div class="btns"><button id="again">2일차 다시 하기</button><button id="restart" class="ghost">처음부터</button><button id="pick" class="ghost">날짜 선택</button></div>`;
+  const nx=WEEK.find(w=>w.d===S.day+1);
+  const next=S.day<7
+    ?`<p class="small">내일의 주제 — <b style="color:var(--accent)">${S.day+1}일차: ${nx.theme}</b>${nx.ready?'':' (아직 준비 중)'}</p><div class="btns">${nx.ready?`<button id="next">${S.day+1}일차로 넘어가기</button>`:''}<button id="again" class="ghost">${S.day}일차 다시 하기</button><button id="pick" class="ghost">날짜 선택</button></div>`
+    :`<div class="btns"><button id="ending">이야기의 끝으로</button><button id="again" class="ghost">7일차 다시 하기</button><button id="pick" class="ghost">날짜 선택</button></div>`;
   card.innerHTML=`<h2>밤 — 생존 일지</h2><div class="sub">${S.day}일차 · 발견한 기억 ${memCount}/${memTotal()}</div>
   <div class="paper">${L.map(l=>`<p>${l}</p>`).join('')}</div>
   <div class="note"><div class="nh">📖 생존 수첩 ${S.day}쪽 — ${N.title}</div><ul>${N.body.map(b=>`<li>${b}</li>`).join('')}</ul><div class="did">오늘 직접 해 본 것: ${N.did()}</div></div>
@@ -1164,7 +1282,8 @@ function endDay(forced){
   ${next}`;
   ov.classList.remove('hide');
   const $=id=>document.getElementById(id);
-  if($('next'))$('next').onclick=()=>startDay(2);
+  if($('next'))$('next').onclick=()=>startDay(S.day+1);
+  if($('ending'))$('ending').onclick=showEnding;
   if($('again'))$('again').onclick=retryDay;
   if($('restart'))$('restart').onclick=()=>startDay(1);
   if($('pick'))$('pick').onclick=()=>showTitle(false);
@@ -1179,10 +1298,28 @@ function gameOver(){
   ov.classList.remove('hide');document.getElementById('again').onclick=retryDay;document.getElementById('pick').onclick=()=>showTitle(false);
 }
 
+const JOURNAL={1:journal1,2:journal2};
+DAYS[3]={theme:'불씨가 꺼졌다',wake:'눈을 떴다. 라이터를 그어 봤지만 딸깍 소리뿐이다.',
+  intro:()=>`<h2>3일차</h2><div class="sub">불씨가 꺼졌다</div>
+  <p>폭풍이 지나간 아침. 라이터를 몇 번이고 그어 봤지만 불꽃이 일지 않는다. 가스가 다 떨어졌다.</p>
+  <p>오늘은 <b>라이터 없이 불을 피우는 법</b>을 익혀야 한다. 불꽃을 낼 것, 불꽃을 받아 줄 것, 그리고 불을 키울 것.</p>
+  <p class="small">숲은 밤새 비에 젖었다. 아직 가 보지 않은 숲 깊은 곳과 강 위쪽에 필요한 것이 있을지 모른다.<br>불은 작은 것에서 큰 것으로 키웁니다. 순서가 중요해요.</p>`};
+NOTES[3]={title:'불 피우기',body:['불이 타려면 세 가지가 필요하다: 탈 것, 공기, 열.','작은 것부터 키운다: 불쏘시개(마른 풀·자작나무 껍질) → 잔가지 → 장작.','잔가지는 원뿔 모양으로 세워 공기가 통하게 한다.','젖은 나무는 겉을 깎아 마른 속을 쓴다. 젖은 장작은 연기만 낸다.','부싯돌을 쇳조각에 비스듬히 그어 불꽃을 불쏘시개에 떨어뜨린다.'],
+  did:()=>S.fireSkill?'부싯돌로 불 피우기 성공':S.fire?'불을 붙였지만 장작까지는 못 올림':'아직 불을 피우지 못함'};
+JOURNAL[3]=(forced,home)=>{
+  const L=['3일차.'];
+  if(S.fireSkill)L.push('라이터 없이 불을 피웠다. 껍질에 불꽃이 옮겨붙던 순간, 소리를 지를 뻔했다.');
+  else L.push('결국 불을 피우지 못했다. 차가운 저녁을 먹었다.');
+  if(S.flags&&S.flags.d3boil)L.push('그 불로 물을 끓였다. 불이 있으면 물도 있다.');
+  if(S.found.burntphoto)L.push('숲 깊은 곳에 오래된 모닥불 자리가 있었다. 나 말고도 누군가 그날 이후 여기서 불을 피웠다. 재 속의 사진, 수아 입학식. 노란 우산을 든 아이.');
+  if(forced&&!home)L.push('불빛 없는 밤길을 더듬어 쉼터로 돌아왔다.');
+  return L;
+};
+// @@DAY_SCREENS@@
 const WEEK=[
   {d:1,theme:'물이 탁해졌다',skill:'식수 만들기',ready:true},
   {d:2,theme:'폭풍이 온다',skill:'쉼터와 체온',ready:true},
-  {d:3,theme:'불씨가 꺼졌다',skill:'불 피우기'},
+  {d:3,theme:'불씨가 꺼졌다',skill:'불 피우기',ready:true},
   {d:4,theme:'배가 고프다',skill:'먹을 것 구하기'},
   {d:5,theme:'다쳤다',skill:'응급처치'},
   {d:6,theme:'북쪽은 어디일까',skill:'방향 찾기'},
@@ -1198,6 +1335,7 @@ function presetFor(n){
     S.seenAreas={ruins:1,forest:1,river:1};
     S.food=50;S.water=55;S.mind=55;S.hp=80;
   }
+  for(let d=3;d<=n;d++)(PRESET[d]||(()=>{}))();
 }
 function showTitle(fromGame){
   const inGame=fromGame&&S&&!S.ended&&S.running&&ov.classList.contains('hide');
