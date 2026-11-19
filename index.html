@@ -139,7 +139,7 @@
       <div id="hudTop" class="band">
         <div id="dayInfo"><span id="title">1일차</span><span id="themeTxt">물이 탁해졌다</span><span id="clock">06:00</span></div>
         <div id="stats"></div>
-        <div id="topBtns"><button id="fsBtn" class="ib" title="전체 화면">⛶</button><button id="pauseBtn" class="ib" title="일시정지">⏸</button><button id="menuBtn" class="ib" title="날짜 선택">☰</button><button id="mute" class="ib" title="배경음악">♪ ON</button></div>
+        <div id="topBtns"><button id="zoomBtn" class="ib" title="확대 배율">🔍</button><button id="fsBtn" class="ib" title="전체 화면">⛶</button><button id="pauseBtn" class="ib" title="일시정지">⏸</button><button id="menuBtn" class="ib" title="날짜 선택">☰</button><button id="mute" class="ib" title="배경음악">♪ ON</button></div>
       </div>
       <canvas id="cv" width="800" height="480"></canvas>
       <div id="ring"></div><div id="cap"></div>
@@ -162,14 +162,16 @@
 const cv=document.getElementById('cv'),ctx=cv.getContext('2d');
 const W=800,H=480; // world size
 // camera: full map on big screens; on phones it zooms in and follows the hero
-const CAM={x:0,y:0,dx:0,dy:0,z:1,cw:800,ch:480,vw:800,vh:480,mode:'',snap:true};
+const ZOOMS=[1.5,2,1]; // PC/tablet: zoomed-in follow camera by default; 1 = whole map
+const CAM={x:0,y:0,dx:0,dy:0,z:1,cw:800,ch:480,vw:800,vh:480,mode:'',snap:true,zoom:(()=>{try{const v=+localStorage.getItem('ls_zoom');return ZOOMS.includes(v)?v:1.5}catch(e){return 1.5}})()};
 function applyLayout(){
   const small=Math.min(innerWidth,innerHeight)<560,port=innerHeight>innerWidth;
   const mode=small?(port?'phoneP':'phoneL'):'full';
   // landscape phones fill the whole screen, so the canvas takes the screen's own aspect
-  const lch=Math.max(300,Math.min(480,Math.round(800*innerHeight/innerWidth/2)*2)),key=mode+(mode==='phoneL'?lch:'');
+  const lch=Math.max(300,Math.min(480,Math.round(800*innerHeight/innerWidth/2)*2)),key=mode+(mode==='phoneL'?lch:'')+(mode==='full'?CAM.zoom:'');
   if(key===CAM.key)return;CAM.key=key;CAM.mode=mode;document.body.dataset.mode=mode;
-  if(mode==='phoneP'){CAM.cw=480;CAM.ch=600;CAM.z=1.5}else if(mode==='phoneL'){CAM.cw=800;CAM.ch=lch;CAM.z=2}else{CAM.cw=800;CAM.ch=480;CAM.z=1}
+  if(mode==='phoneP'){CAM.cw=480;CAM.ch=600;CAM.z=1.5}else if(mode==='phoneL'){CAM.cw=800;CAM.ch=lch;CAM.z=2}else{CAM.cw=800;CAM.ch=480;CAM.z=CAM.zoom}
+  const zb=document.getElementById('zoomBtn');if(zb){zb.style.display=mode==='full'?'':'none';zb.textContent=CAM.zoom===1?'🔍 전체':'🔍 '+CAM.zoom+'×'}
   CAM.vw=CAM.cw/CAM.z;CAM.vh=CAM.ch/CAM.z;cv.width=CAM.cw;cv.height=CAM.ch;CAM.snap=true;
 }
 function updateCam(){
@@ -177,7 +179,7 @@ function updateCam(){
   if(CAM.snap){CAM.x=tx;CAM.y=ty;CAM.snap=false}else{CAM.x+=(tx-CAM.x)*.12;CAM.y+=(ty-CAM.y)*.12}
   CAM.dx=Math.round(CAM.x/2)*2;CAM.dy=Math.round(CAM.y/2)*2; // whole buffer pixels keep the dots crisp
 }
-applyLayout();addEventListener('resize',applyLayout);addEventListener('orientationchange',()=>setTimeout(applyLayout,200));
+addEventListener('resize',applyLayout);addEventListener('orientationchange',()=>setTimeout(applyLayout,200));
 
 // ---------- things to find ----------
 // kind: 'use' = practical item, 'mem' = memory item (can be taken home or left)
@@ -1861,6 +1863,7 @@ function showTitle(fromGame){
 {const fs=document.getElementById('fsBtn');const root=document.documentElement;
   if(!document.fullscreenEnabled||!root.requestFullscreen)fs.style.display='none';
   fs.onclick=e=>{e.currentTarget.blur();try{if(document.fullscreenElement)document.exitFullscreen();else root.requestFullscreen().catch(()=>{})}catch(_){}}}
+document.getElementById('zoomBtn').onclick=e=>{e.currentTarget.blur();CAM.zoom=ZOOMS[(ZOOMS.indexOf(CAM.zoom)+1)%ZOOMS.length];try{localStorage.setItem('ls_zoom',CAM.zoom)}catch(_){}applyLayout();Sfx.play('pick')};
 document.getElementById('pauseBtn').onclick=e=>{
   e.currentTarget.blur();
   if(!S||S.ended||!S.running||!ov.classList.contains('hide'))return;
@@ -1870,6 +1873,7 @@ document.getElementById('pauseBtn').onclick=e=>{
   document.getElementById('unpause').onclick=()=>{ov.classList.add('hide');S.running=true;dirtyUI=true};
 };
 addEventListener('keydown',e=>{if(e.key==='p'||e.key==='P'){const u=document.getElementById('unpause');if(u&&!ov.classList.contains('hide'))u.click();else document.getElementById('pauseBtn').click()}});
+applyLayout();
 document.getElementById('menuBtn').onclick=e=>{Music.start();showTitle(true);e.currentTarget.blur()};
 S=fresh();S.fog=newFog();
 showTitle(false);
