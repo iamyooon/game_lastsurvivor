@@ -496,8 +496,8 @@ function renderUI(){
   if(S.sick)items.push('⚠ 배탈');
   if(S.wet)items.push('💧 젖음');
   invEl.innerHTML=items.length?items.map(t=>`<span class="item">${t}</span>`).join(''):'<span style="color:var(--dim)">비어 있음</span>';
-  const o=nearPOI();currentActions=actionsFor(o).concat(drinkActions()).concat(globalDayActions());
-  if(I.can)currentActions.push({label:'통조림 먹기',cost:10,ok:true,fn:()=>{emote('♥');S.inv.can--;S.ateCan++;S.food=Math.min(100,S.food+30);log('칼로 통조림을 땄다. 정체 모를 콩 요리. 맛은 상관없다. (식량 +30)')}});
+  const o=nearPOI();currentActions=actionsFor(o).concat(S._walk?[]:drinkActions().concat(globalDayActions()));
+  if(I.can&&!S._walk)currentActions.push({label:'통조림 먹기',cost:10,ok:true,fn:()=>{emote('♥');S.inv.can--;S.ateCan++;S.food=Math.min(100,S.food+30);log('칼로 통조림을 땄다. 정체 모를 콩 요리. 맛은 상관없다. (식량 +30)')}});
   const key=(o?(o.id+(o.find?o.find.id:'')):'')+'|'+currentActions.map(a=>a.label+a.ok).join(',')+'|'+I.can;
   if(key!==lastActKey||dirtyUI){
     lastActKey=key;dirtyUI=false;
@@ -1031,7 +1031,7 @@ FINDS.push({id:'diary',day:4,at:99*60,x:640,y:300,kind:'mem',name:'젖은 가방
   text:'낚싯줄에 걸려 올라온 젖은 가방. 비닐에 싸인 수첩이 들어 있었다. 몇 장만 읽을 수 있다.\n\n「9월 2일. 막차는 오지 않았다. 수아는 우산을 꼭 쥐고 울지 않았다.」\n「9월 5일. 강가 오두막에 자리를 잡았다. 수아가 라디오를 고쳤다.」\n\n강가 오두막. 라디오.\n…내 쉼터다.'});
 
 ON_START[4]=()=>{S.food=Math.min(S.food,28);S.fishTry=0;S.mushLeft=2;S.dandLeft=3;S.wormLeft=3;if(S.inv.can)S.inv.can=0};
-PRESET[4]=()=>{const I=S.inv;I.flint=1;I.steel=1;I.bark=1;I.twig=2;S.fireSkill=true;S.notes=[1,2,3];S.storedWood=0;I.wood=2;S.found.burntphoto='placed';S.placedOrder.push('burntphoto');[[60,440],[628,70],[36,318]].forEach(([x,y])=>revealOn(S.fog,x,y,12))};
+PRESET[4]=()=>{const I=S.inv;I.lighter=false;I.flint=1;I.steel=1;I.bark=1;I.twig=2;S.fireSkill=true;S.notes=[1,2,3];S.storedWood=0;I.wood=2;S.found.burntphoto='placed';S.placedOrder.push('burntphoto');[[60,440],[628,70],[36,318]].forEach(([x,y])=>revealOn(S.fog,x,y,12))};
 
 DAY_HOOKS.actions.push((o,a)=>{
   if(!o||S.day<4)return;const I=S.inv;
@@ -1162,6 +1162,84 @@ DAY_HOOKS.draw.push(now=>{
   seed=606;for(let i=0;i<20;i++)P(lc,x+rnd()*30,y+16+rnd()*6,rnd()<.5?'#8a867c':'#6e6a62');
   // blood drops while bleeding
   if(S.wound==='bleed'&&S._walk&&Math.floor(now/400)%3===0)P(lc,L(S.p.x)+2,L(S.p.y)+12,'#8a1e1e');
+});
+// ===== DAY 6 · 북쪽은 어디일까 (방향 찾기) =====
+addIcons({
+  routemap:[['ppppppp','pbbpppp','ppbpppp','pppbppp','ppppbrp','pppppbp','ppppppp'],{p:'#e8e0cc',b:'#3a62b0',r:'#c83a30'}],
+});
+addPOI({id:'hill',day:6,x:380,y:40,r:34,name:'북쪽 언덕'});
+addPOI({id:'stickspot',day:6,x:470,y:330,r:24,name:'쉼터 앞 공터'});
+FINDS.push({id:'routemap',day:6,x:612,y:36,kind:'mem',name:'버스 노선도 조각',
+  text:'정류장 뒤 수풀에서 녹슨 노선도 판 조각을 주웠다.\n강을 따라 북쪽으로 이어지던 파란 선이 산 앞에서 끊겼다. 끝에 「북부 대피소」.\n\n그 옆에 누군가 펜으로 동그라미를 쳐 놓았다.\n「배 — 강 하구 선착장」'});
+
+ON_START[6]=()=>{S.stick=null};
+PRESET[6]=()=>{const I=S.inv;I.bandage=0;S.pharmacyDone=true;S.found.graffiti='seen';S.notes=[1,2,3,4,5];[[44,254],[34,226]].forEach(([x,y])=>revealOn(S.fog,x,y,12))};
+
+function northCount(){return [S.sawSunrise,S.shadowDone,S.foundPolaris].filter(Boolean).length}
+function checkNorth(){if(!S.northKnown&&northCount()>=2){S.northKnown=true;emote('!');log('두 가지 방법이 같은 쪽을 가리킨다. 북쪽은 언덕 너머, 강 상류 쪽이다.')}}
+DAY_HOOKS.actions.push((o,a)=>{
+  if(!o||S.day!==6)return;
+  if(o.id==='hill'&&!S.sawSunrise)a.push({label:'해 뜨는 쪽 바라보기',cost:20,ok:S.t<8*60,why:'해가 이미 높이 떴다',fn:()=>{S.sawSunrise=true;log('강 건너, 오른쪽 하늘이 붉어지더니 해가 떠올랐다. 해 뜨는 쪽이 동쪽. 그렇다면 북쪽은 왼손 쪽, 언덕 너머다.');checkNorth()}});
+  if(o.id==='stickspot'&&!S.shadowDone){
+    if(!S.stick)a.push({label:'막대 꽂고 그림자 끝 표시',cost:10,ok:S.t>=9*60&&S.t<16*60,why:S.t<9*60?'해가 아직 낮다':'해가 너무 기울었다',fn:()=>{S.stick={t:S.t};log('곧은 막대를 땅에 꽂고, 그림자 끝에 작은 돌을 놓았다. 그림자가 움직이길 기다리자.')}});
+    else a.push({label:'두 번째 그림자 끝 표시',cost:10,ok:true,fn:()=>{
+      if(S.t-S.stick.t<30){emote('?');log('그림자가 거의 안 움직였다. 좀 더 기다리자. (30분쯤)');return}
+      S.shadowDone=true;log('새 그림자 끝에 돌을 하나 더 놓았다. 첫 돌이 서쪽, 두 번째 돌이 동쪽. 그 선에 직각으로, 해 반대편이 북쪽이다.');checkNorth()}});
+  }
+});
+DAY_HOOKS.global.push(a=>{
+  if(!S||S.day!==6||S.foundPolaris)return;
+  if(S.t>=20*60&&!inShelter())a.unshift({label:'밤하늘 보기',cost:10,ok:true,fn:()=>setTimeout(showSky,30)});
+});
+// --- night sky: find Polaris from the Big Dipper ---
+function showSky(){
+  S.running=false;
+  const order=[0,1,2].sort(()=>Math.random()-.5),names=['ㄱ','ㄴ','ㄷ'];
+  card.innerHTML=`<h2>밤하늘</h2><div class="sub">북두칠성에서 북극성 찾기</div>
+  <canvas id="sky" width="320" height="200" style="width:100%;image-rendering:pixelated;border:2px solid #000;background:#0a0e1e"></canvas>
+  <p class="small" style="margin-top:8px">국자 모양 일곱 별이 북두칠성이에요. 국자 <b>끝의 두 별</b>을 이은 선을 국자 입구 쪽으로 <b>다섯 배쯤</b>늘이면 그 자리에 북극성이 있습니다. 어느 별일까요?</p>
+  <div class="btns" id="skyBtns">${names.map((n,i)=>`<button data-i="${i}">${n} 별</button>`).join('')}</div><p class="small" id="skyMsg"></p>`;
+  ov.classList.remove('hide');
+  const c=document.getElementById('sky').getContext('2d');
+  seed=7070;for(let i=0;i<140;i++){const b=rnd();c.fillStyle=`rgba(230,235,255,${.25+b*.5})`;c.fillRect(rnd()*320|0,rnd()*200|0,b>.9?2:1,1)}
+  const dip=[[88,160],[114,150],[140,147],[168,153],[172,176],[204,172],[200,150]];
+  c.strokeStyle='rgba(150,170,220,.35)';c.beginPath();dip.forEach(([x,y],i)=>i?c.lineTo(x,y):c.moveTo(x,y));c.lineTo(168,153);c.stroke();
+  c.setLineDash([3,4]);c.strokeStyle='rgba(232,168,76,.35)';c.beginPath();c.moveTo(204,172);c.lineTo(200,150);c.stroke();c.setLineDash([]);
+  dip.forEach(([x,y])=>{c.fillStyle='#fff8e0';c.fillRect(x-1,y-1,3,3);c.fillStyle='rgba(255,248,224,.4)';c.fillRect(x-2,y,5,1);c.fillRect(x,y-2,1,5)});
+  const cand=[[180,40],[78,52],[276,74]]; // index 0 is Polaris
+  order.forEach((ci,i)=>{const [x,y]=cand[ci];c.fillStyle='#fff8e0';c.fillRect(x-1,y-1,3,3);c.fillStyle='#e8a84c';c.font='bold 12px sans-serif';c.fillText(names[i],x+5,y+4)});
+  document.querySelectorAll('#skyBtns button').forEach(b=>b.onclick=()=>{
+    const ci=order[+b.dataset.i];
+    if(ci===0){S.foundPolaris=true;Sfx.play('discover');ov.classList.add('hide');S.running=true;dirtyUI=true;emote('!');log('찾았다. 다른 별들이 도는 동안 저 별만 제자리다. 북극성 아래가 북쪽.');checkNorth()}
+    else{Sfx.play('leave');document.getElementById('skyMsg').textContent='그 별은 아니다. 국자 끝 두 별(점선)을 이은 방향으로 따라가 보자.'}
+  });
+}
+MONO[6]=()=>{
+  let s;
+  if(!S.sawSunrise&&S.t<8*60)s='해가 뜨기 전에 북쪽 언덕에 올라 해 뜨는 쪽을 보자.';
+  else if(!S.shadowDone&&!S.stick&&S.t<16*60)s=S.t<9*60?'해가 좀 더 높이 뜨면 쉼터 앞 공터에 막대를 꽂아 그림자로 방향을 찾자.':'쉼터 앞 공터에 막대를 꽂아 그림자로 방향을 찾자.';
+  else if(!S.shadowDone&&S.stick)s=S.t-S.stick.t<30?'그림자 끝이 움직이길 기다리자. 30분쯤.':'그림자가 움직였다. 두 번째 표시를 하자.';
+  else if(!S.foundPolaris)s=S.t>=20*60?(inShelter()?'밖으로 나가 밤하늘을 보자.':'지금이다. 밤하늘을 보자. 북두칠성을 찾자.'):'밤이 되면 하늘을 보자. 북두칠성으로 북극성을 찾을 수 있다.';
+  else s='북쪽을 알았다. 언덕 너머, 강 상류 쪽.';
+  if(!S.found.routemap&&S.t<18*60&&S.t>=8*60)s+=' 정류장 뒤쪽에 뭔가 남아 있을지도.';
+  if(S.carry.length&&S.t<18*60)s+=' 배낭 속 물건은 쉼터에 가져다 두자.';
+  return {s,count:`방향 — 해돋이 ${ck(S.sawSunrise)} · 그림자 ${ck(S.shadowDone)} · 북극성 ${ck(S.foundPolaris)}`};
+};
+DAY_HOOKS.draw.push(now=>{
+  if(S.day<6)return;
+  // the hill to the north
+  const hx=190,hy=20;
+  for(let y=-12;y<=12;y++)for(let x=-28;x<=28;x++){const d=(x*x)/(28*28)+(y*y)/(12*12);if(d>1)continue;
+    const light=(-x-y*2)/40+(1-d)*.6;const k=Math.floor(light*3+bay(x+400,y+400)*1.2);P(lc,hx+x,hy+y,['#3e4c2c','#4a5c34','#56693c','#647a46'][Math.max(0,Math.min(3,k))])}
+  [[-12,2],[8,-3],[15,5]].forEach(([x,y])=>{P(lc,hx+x,hy+y,'#8a867c',3,2);P(lc,hx+x,hy+y,'#a8a49a',2,1)});
+  // shadow stick and marker stones
+  if(S.day===6||S.shadowDone){const sx=235,sy=165;
+    if(S.stick||S.shadowDone){P(lc,sx,sy-8,'#6a4a2c',1,9);const len=S.shadowDone?0:Math.min(6,((S.t-(S.stick?S.stick.t:S.t))/10)|0);P(lc,sx+1,sy,'rgba(0,0,0,.35)',7,1);
+      P(lc,sx+8,sy,'#a8a49a',2,1);if(S.shadowDone){P(lc,sx+2,sy+3,'#a8a49a',2,1);for(let i=0;i<6;i++)P(lc,sx+3+i,sy+2-(i>>2)*0,'rgba(232,168,76,.6)')}}
+  }
+  // compass rose once north is known
+  if(S.northKnown){const cx=14,cy=16;P(lc,cx-1,cy-8,'#e8a84c',2,8);P(lc,cx-1,cy,'#8a8476',2,6);P(lc,cx-5,cy,'#8a8476',10,1);
+    [[0,0],[0,1],[0,2],[0,3],[1,1],[2,2],[3,0],[3,1],[3,2],[3,3]].forEach(([x,y])=>P(lc,cx+5+x,cy-12+y,'#ece4d2'))}
 });
 // @@DAY_WORLD@@
 // ---------- loop ----------
@@ -1503,6 +1581,22 @@ JOURNAL[5]=(forced,home)=>{
   if(S.found.graffiti)L.push('약국 벽의 글씨. 「수아야 아빠는 북쪽 대피소에 있다. 산 너머 터널을 지나서.」 그 아래 다른 글씨. 「터널 무너짐. 길 없음.」');
   return L;
 };
+DAYS[6]={theme:'북쪽은 어디일까',wake:'눈을 떴다. 아직 어둑하다. 오늘은 해보다 먼저 일어났다.',
+  intro:()=>`<h2>6일차</h2><div class="sub">북쪽은 어디일까</div>
+  <p>약국 벽의 글씨가 머릿속을 떠나지 않는다. 「아빠는 북쪽 대피소에 있다.」</p>
+  <p>그런데 북쪽은 어느 쪽일까. 나침반은 없다. 오늘은 <b>해와 그림자와 별로 방향을 찾는 법</b>을 익혀야 한다.</p>
+  <p class="small">해는 금방 떠오릅니다. 서두르세요.<br>한 가지 방법만 믿지 말고, 두 가지 이상으로 확인하세요.<br>북쪽 언덕은 아직 가 보지 않은 곳이에요.</p>`};
+NOTES[6]={title:'방향 찾기',body:['해는 동쪽에서 떠서 남쪽 하늘을 지나 서쪽으로 진다. (우리나라 같은 북반구 기준)','그림자 막대: 막대를 세우고 그림자 끝을 표시, 15~30분 뒤 다시 표시한다. 첫 점이 서쪽, 두 번째 점이 동쪽.','밤에는 북두칠성 국자 끝 두 별을 이은 선을 약 5배 늘인 곳에 북극성이 있다. 북극성 쪽이 북쪽.','한 가지 방법만 믿지 말고 여러 방법으로 확인한다.','강이나 길 같은 큰 지형을 기준선으로 기억해 둔다.'],
+  did:()=>[S.sawSunrise?'해 뜨는 방향 보기':null,S.shadowDone?'그림자 막대법':null,S.foundPolaris?'북극성 찾기':null].filter(Boolean).join(' · ')||'아직 못 해 봄'};
+JOURNAL[6]=(forced,home)=>{
+  const L=['6일차.'];
+  if(S.sawSunrise)L.push('언덕에서 해가 뜨는 걸 봤다. 강 건너 오른쪽. 그쪽이 동쪽이다.');
+  if(S.shadowDone)L.push('막대 하나와 돌 두 개로 동서를 그었다. 해가 움직이는 게 아니라 내가 서 있는 땅이 돈다는 게 새삼스러웠다.');
+  if(S.foundPolaris)L.push('밤에 북두칠성을 찾았다. 국자 끝을 따라가니 혼자 가만히 있는 별. 북극성.');
+  L.push(S.northKnown?'북쪽을 안다. 언덕 너머, 강 상류. 아빠가 간 쪽.':'아직 확신이 없다. 방향 하나 찾는 게 이렇게 어렵다니.');
+  if(S.found.routemap)L.push('노선도 조각의 동그라미. 「배 — 강 하구 선착장」. 산이 막혔다면, 강으로.');
+  return L;
+};
 // @@DAY_SCREENS@@
 const WEEK=[
   {d:1,theme:'물이 탁해졌다',skill:'식수 만들기',ready:true},
@@ -1510,7 +1604,7 @@ const WEEK=[
   {d:3,theme:'불씨가 꺼졌다',skill:'불 피우기',ready:true},
   {d:4,theme:'배가 고프다',skill:'먹을 것 구하기',ready:true},
   {d:5,theme:'다쳤다',skill:'응급처치',ready:true},
-  {d:6,theme:'북쪽은 어디일까',skill:'방향 찾기'},
+  {d:6,theme:'북쪽은 어디일까',skill:'방향 찾기',ready:true},
   {d:7,theme:'누군가에게',skill:'구조 신호 보내기'},
 ];
 // a reasonable "yesterday" for starting a later day directly
