@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <link rel="preconnect" href="https://fonts.googleapis.com"><link href="https://fonts.googleapis.com/css2?family=Press+Start+2P&display=swap" rel="stylesheet">
-<title>마지막 사람 — 1일차 프로토타입</title>
+<title>마지막 사람 — 프로토타입</title>
 <style>
   :root{--bg:#16141a;--panel:#211e24;--line:#3b3540;--edge:#0b0a0d;--text:#ece4d2;--dim:#9c9486;--accent:#e8a84c}
   *{box-sizing:border-box}
@@ -15,7 +15,7 @@
   header h1{font-size:18px;margin:0;font-weight:800;letter-spacing:.04em;text-shadow:2px 2px 0 #000}
   header .theme{color:var(--accent);font-size:14px;text-shadow:1px 1px 0 #000}
   #clock{font-family:"Press Start 2P",monospace;font-size:12px;color:var(--text);background:var(--edge);padding:6px 8px;border:2px solid var(--line)}
-  #stats{display:grid;grid-template-columns:repeat(4,1fr);gap:12px;margin-bottom:12px}
+  #stats{display:grid;grid-template-columns:repeat(5,1fr);gap:12px;margin-bottom:12px}
   .stat{padding:6px 8px;font-size:12px}
   .stat .row{display:flex;justify-content:space-between;margin-bottom:5px;color:var(--dim)}
   .stat .row b{color:var(--text);font-family:"Press Start 2P",monospace;font-size:10px}
@@ -55,13 +55,17 @@
   .card .small{color:var(--dim);font-size:12px}
   .card .btns{display:flex;gap:10px;flex-wrap:wrap;margin-top:6px}
   .card .shelf{text-align:center;margin:6px 0 10px}
-  @media (max-width:560px){#stats{grid-template-columns:repeat(2,1fr)}}
+  @media (max-width:560px){#stats{grid-template-columns:repeat(3,1fr)}}
+  .card .note{background:#22301f;border:3px solid #0e140c;box-shadow:4px 4px 0 #000;padding:12px 14px;margin:0 0 14px;color:#dfe8cf;font-size:13px;line-height:1.65;background-image:repeating-linear-gradient(transparent 0 21px,rgba(255,255,255,.05) 21px 22px)}
+  .card .note .nh{color:#b9d98a;font-weight:700;margin-bottom:6px}
+  .card .note ul{margin:0;padding-left:18px}
+  .card .note .did{margin-top:8px;color:#9fb486;font-size:12px}
 </style>
 </head>
 <body>
 <div id="wrap">
   <header>
-    <div><h1>마지막 사람 · 1일차</h1><div class="theme">오늘의 주제 — 물이 탁해졌다</div></div>
+    <div><h1 id="title">마지막 사람 · 1일차</h1><div class="theme" id="themeTxt">오늘의 주제 — 물이 탁해졌다</div></div>
     <div style="display:flex;align-items:center;gap:10px"><div id="clock">06:00</div><button id="mute" style="padding:4px 10px;font-size:12px">♪ 음악 켜짐</button></div>
   </header>
   <div id="stats"></div>
@@ -101,18 +105,26 @@ const FINDS=[
   {id:'musicbox',x:262,y:452,icon:'🎵',kind:'mem',name:'오르골',
    text:'흙을 털고 태엽을 감았다.\n몇 음이 흘러나오다 멈췄다.\n처음 듣는 곡인데, 다음 음을 알 것 같았다.'},
 ];
-const MEM_TOTAL=FINDS.filter(f=>f.kind==='mem').length;
+FINDS.push(
+  {id:'umbrella',day:2,x:250,y:96,kind:'mem',name:'노란 우산',
+   text:'무너진 벽 틈에 꽂혀 있던 아이용 우산. 노란 천은 바랬고 살이 두 개 부러졌다.\n펼치니 안쪽에 매직으로 쓴 이름.\n\n「3학년 2반 이수아」'},
+  {id:'newspaper',day:2,at:17*60,x:452,y:318,kind:'mem',name:'날아온 신문 조각',
+   text:'폭풍에 날려 와 쉼터 앞에 들러붙은 신문 조각. 젖어서 글자가 반쯤 지워졌다.\n\n「…북부 대피소 수용 인원 초과… 도착하지 못한 시민은 각 지역 임시 거처에서 구조를 기다리…」\n\n날짜는 그날의 다음 날이다.'}
+);
+const visible=f=>(f.day||1)<=S.day&&(!f.at||S.t>=f.at);
+const memTotal=()=>FINDS.filter(f=>f.kind==='mem'&&(f.day||1)<=S.day).length;
 
 // ---------- state ----------
 let S;
 function fresh(){return{
-  t:360, hp:80, food:55, water:45, mind:50,
-  inv:{bottle:false,bw:null,wood:0,can:0,cloth:false,lighter:false,cray:0}, // bw: water in bottle: null|'dirty'|'filtered'|'rain'|'boiled'
+  day:1, t:360, hp:80, food:55, water:45, mind:50, warm:90,
+  inv:{bottle:false,bw:null,wood:0,can:0,cloth:false,lighter:false,cray:0,metal:0,grass:0,blanket:false}, // bw: water in bottle: null|'dirty'|'filtered'|'rain'|'boiled'
   found:{},          // id -> 'taken' | 'left' | 'placed' | 'used'
   carry:[],          // memory items in backpack
   placedOrder:[],
   car:0, barrel:false, bush:0, rock:false,
   fire:false, radio:0, signal:false,
+  prep:{roof:false,floor:false,door:false}, storedWood:0, wet:false, wasWet:false, metalLeft:2, grassLeft:3, blanketTaken:false, barrelFull:false, stormMsgs:{}, flash:0, notes:[],
   drankClean:0, drankDirty:0, drankRiver:0, sick:false, ateCan:0, berries:0, forest:0,
   p:{x:400,y:300,face:1,step:0}, target:null, running:false, ended:false, warnedDark:false
 }}
@@ -128,14 +140,17 @@ const POI=[
   {id:'fire',x:400,y:345,r:42,name:'모닥불 자리'},
   {id:'radio',x:368,y:222,r:30,name:'낡은 라디오'},
   {id:'bed',x:436,y:222,r:30,name:'잠자리'},
+  {id:'metal',day:2,x:205,y:70,r:30,name:'무너진 함석 지붕'},
+  {id:'grass',day:2,x:520,y:388,r:30,name:'마른 풀밭'},
+  {id:'shelter',day:2,x:400,y:246,r:22,name:'쉼터 안'},
 ];
 function nearPOI(){
   const p=S.p;
   // undiscovered things take priority
-  for(const f of FINDS){if(!S.found[f.id]&&Math.hypot(p.x-f.x,p.y-f.y)<34)return{id:'find',find:f,name:'무언가 있다'}}
+  for(const f of FINDS){if(!S.found[f.id]&&visible(f)&&Math.hypot(p.x-f.x,p.y-f.y)<34)return{id:'find',find:f,name:'무언가 있다'}}
   if(p.x>628)return POI.find(o=>o.id==='river');
   let best=null,bd=1e9;
-  for(const o of POI){if(o.id==='river')continue;const d=Math.hypot(p.x-o.x,p.y-o.y);if(d<o.r&&d<bd){bd=d;best=o}}
+  for(const o of POI){if(o.id==='river'||(o.day||1)>S.day)continue;const d=Math.hypot(p.x-o.x,p.y-o.y);if(d<o.r&&d<bd){bd=d;best=o}}
   return best;
 }
 const inShelter=()=>S.p.x>338&&S.p.x<462&&S.p.y>184&&S.p.y<268;
@@ -150,9 +165,11 @@ function actionsFor(o){
       if(S.car===0)a.push({label:'트렁크 열어 보기',cost:20,ok:true,fn:()=>{S.car=1;I.cloth=true;log('녹슨 트렁크를 힘껏 들어 올렸다. 곰팡내 나는 담요 사이에서 쓸 만한 헝겊을 찾았다. (헝겊 획득)')}});
       else if(S.car===1)a.push({label:'운전석 살펴보기',cost:15,ok:true,fn:()=>{S.car=2;I.lighter=true;S.mind=Math.min(100,S.mind+3);log('글러브박스 안에 일회용 라이터. 몇 번 그으니 작은 불꽃이 인다. 아직 가스가 남아 있다. (라이터 획득)')}});
       else a.push({label:'운전석에 앉아 보기',cost:10,ok:true,fn:()=>{S.mind=Math.min(100,S.mind+2);log('운전석에 앉아 금 간 유리 너머를 봤다. 이 길 끝엔 뭐가 있었을까.')}});
+      if(S.day>=2&&!S.blanketTaken)a.unshift({label:'뒷좌석 담요 꺼내기',cost:15,ok:true,fn:()=>{S.blanketTaken=true;I.blanket=true;log('뒷좌석에서 곰팡내 나는 담요를 꺼냈다. 털어 보니 아직 두툼하다. (담요 획득)')}});
       break;
     case 'barrel':
-      if(!S.barrel)a.push({label:'빗물 병에 담기',cost:10,ok:I.bottle&&!I.bw,why:I.bottle?'병이 이미 차 있다':'담을 그릇이 없다',fn:()=>{S.barrel=true;I.bw='rain';log('어젯밤 비가 통에 조금 고여 있었다. 병 하나를 겨우 채웠다. 맑다.')}});
+      if(S.barrelFull)a.push({label:'빗물 병에 담기',cost:5,ok:I.bottle&&!I.bw,why:I.bottle?'병이 이미 차 있다':'담을 그릇이 없다',fn:()=>{I.bw='rain';log('빗물통이 가득 찼다. 병을 넘치도록 채웠다.')}});
+      else if(!S.barrel)a.push({label:'빗물 병에 담기',cost:10,ok:I.bottle&&!I.bw,why:I.bottle?'병이 이미 차 있다':'담을 그릇이 없다',fn:()=>{S.barrel=true;I.bw='rain';log('어젯밤 비가 통에 조금 고여 있었다. 병 하나를 겨우 채웠다. 맑다.')}});
       else a.push({label:'들여다보기',cost:5,ok:true,fn:()=>log('통 바닥이 말라 있다. 다음 비를 기다려야 한다.')});
       break;
     case 'bush':
@@ -169,14 +186,24 @@ function actionsFor(o){
       a.push({label:'강물 그냥 마시기',cost:5,ok:true,fn:()=>{S.water=Math.min(100,S.water+25);S.hp-=12;S.drankRiver++;S.sick=true;log('목은 축였지만 속이 뒤틀린다. (체력 -12, 배탈)')}});
       break;
     case 'fire':
-      if(!S.fire){
+      if(!S.fire&&stormLevel()>.1)a.push({label:'불 피우기',cost:0,ok:false,why:'비가 퍼붓는다',fn:()=>{}});
+      else if(!S.fire){
         if(I.lighter)a.push({label:'라이터로 불 피우기 (땔감 2)',cost:10,ok:I.wood>=2,why:'땔감이 부족하다',fn:lightFire});
         else a.push({label:'나무 비벼 불 피우기 (땔감 2)',cost:60,ok:I.wood>=2,why:'땔감이 부족하다',fn:()=>{S.mind=Math.max(0,S.mind-3);lightFire();log('한 시간을 비벼서야 연기가 났다. 손바닥이 얼얼하다. (정신력 -3)')}});
       }
       a.push({label:'물 끓이기',cost:25,ok:S.fire&&!!I.bw&&I.bw!=='boiled',why:S.fire?'끓일 물이 없다':'불이 없다',fn:()=>{I.bw='boiled';log('물을 오래 끓였다. 김이 오르는 걸 한참 바라봤다.')}});
       if(I.cray)a.push({label:'가재 구워 먹기',cost:15,ok:S.fire,why:'불이 없다',fn:()=>{I.cray--;S.food=Math.min(100,S.food+18);S.mind=Math.min(100,S.mind+3);log('가재가 붉게 익었다. 한 입 거리지만 따뜻한 음식이다. (식량 +18)')}});
       break;
+    case 'metal':
+      a.push({label:'함석판 뜯어내기',cost:30,ok:S.metalLeft>0,why:'더 뜯을 게 없다',fn:()=>{S.metalLeft--;I.metal++;log(S.metalLeft?'녹슨 함석판 한 장을 비틀어 뜯어냈다. 손바닥이 얼얼하다. (함석판 +1)':'마지막 한 장을 뜯어냈다. 이 정도면 지붕 구멍을 덮을 수 있다. (함석판 +1)')}});break;
+    case 'grass':
+      a.push({label:'마른 풀 베기',cost:20,ok:S.grassLeft>0,why:'남은 마른 풀이 없다',fn:()=>{S.grassLeft--;I.grass++;log(stormLevel()>.1?'젖은 풀뿐이다. 그래도 한 아름 베었다. (마른 풀 +1)':'비 오기 전에 마른 풀을 한 아름 베었다. 바스락거린다. (마른 풀 +1)')}});break;
     case 'shelter':
+      if(!S.prep.roof)a.push({label:'지붕 틈 막기 (함석판 2)',cost:40,ok:I.metal>=2,why:'함석판이 부족하다',fn:()=>{I.metal-=2;S.prep.roof=true;log('함석판으로 지붕 구멍을 덮고 돌로 눌러 두었다. 이제 비가 새지 않을 것이다.')}});
+      if(!S.prep.floor)a.push({label:'바닥에 마른 풀 깔기 (풀 2)',cost:30,ok:I.grass>=2,why:'마른 풀이 부족하다',fn:()=>{I.grass-=2;S.prep.floor=true;log('잠자리 밑에 마른 풀을 두툼하게 깔았다. 땅의 냉기가 덜 올라온다.')}});
+      if(!S.prep.door)a.push({label:'입구에 담요 걸기',cost:15,ok:I.blanket,why:'걸 만한 천이 없다',fn:()=>{I.blanket=false;S.prep.door=true;log('입구에 담요를 걸었다. 바람이 한결 덜 들이친다.')}});
+      if(I.wood>0)a.push({label:`땔감 안에 들여놓기 (${I.wood})`,cost:10,ok:true,fn:()=>{S.storedWood+=I.wood;I.wood=0;log('땔감을 쉼터 구석에 쌓았다. 비 맞은 나무는 불이 안 붙는다.')}});
+      if(S.wet)a.push({label:'젖은 옷 벗어 말리기',cost:40,ok:true,fn:()=>{S.wet=false;S.mind=Math.min(100,S.mind+3);log('젖은 옷을 벗어 짜서 널고, 마른 옷으로 갈아입었다. 떨림이 조금 잦아든다.')}});
       break;
     case 'radio':
       a.push({label:'라디오 켜기',cost:20,ok:true,fn:useRadio});break;
@@ -210,7 +237,7 @@ function useRadio(){
 }
 function eatCan(){
   if(!S.inv.can||!S.running)return;
-  S.inv.can--;S.ateCan++;S.food=Math.min(100,S.food+30);advance(10);
+  Sfx.play('eat');S.inv.can--;S.ateCan++;S.food=Math.min(100,S.food+30);advance(10);
   log('칼로 통조림을 땄다. 정체 모를 콩 요리. 맛은 상관없다. (식량 +30)');
 }
 
@@ -226,28 +253,54 @@ function showFind(f){
   ov.classList.remove('hide');
   const close=()=>{ov.classList.add('hide');S.running=true;dirtyUI=true};
   document.getElementById('c1').onclick=()=>{
+    Sfx.play('pick');
     if(f.id==='bottle'){S.found.bottle='used';S.inv.bottle=true;log('페트병을 챙겼다. 이제 물을 담을 수 있다.')}
     else if(f.id==='can'){S.found.can='used';S.inv.can++;log('통조림을 배낭에 넣었다.')}
     else{S.found[f.id]='taken';S.carry.push(f.id);S.mind=Math.min(100,S.mind+6);log(`${f.name}을(를) 배낭에 넣었다. 쉼터에 가져다 두자. (정신력 +6)`)}
     close();
   };
   const c2=document.getElementById('c2');
-  if(c2)c2.onclick=()=>{S.found[f.id]='left';S.mind=Math.min(100,S.mind+2);log(`${f.name}은(는) 그 자리에 두었다. 여기가 그것의 자리 같았다.`);close()};
+  if(c2)c2.onclick=()=>{Sfx.play('leave');S.found[f.id]='left';S.mind=Math.min(100,S.mind+2);log(`${f.name}은(는) 그 자리에 두었다. 여기가 그것의 자리 같았다.`);close()};
 }
 function placeCarried(){
   if(!S.carry.length)return;
+  Sfx.play('place');
   for(const id of S.carry){
     S.found[id]='placed';S.placedOrder.push(id);S.mind=Math.min(100,S.mind+4);
     const f=FINDS.find(x=>x.id===id);
-    const where={shoe:'문가에',letter:'선반 위에',sign:'벽에 기대어',watch:'벽에 걸어',drawing:'잠자리 옆에',musicbox:'머리맡에'}[id];
+    const where={umbrella:'벽에 기대어 펼쳐',newspaper:'선반 위에 펴서',shoe:'문가에',letter:'선반 위에',sign:'벽에 기대어',watch:'벽에 걸어',drawing:'잠자리 옆에',musicbox:'머리맡에'}[id];
     log(`${f.name}을(를) ${where} 두었다. 쉼터가 조금 덜 비어 보인다. (정신력 +4)`);
   }
   S.carry=[];dirtyUI=true;
 }
 
+// ---------- weather ----------
+function stormLevel(){if(!S||S.day!==2)return 0;const h=S.t/60;if(h<15)return 0;if(h<16)return h-15;if(h<20)return 1;return Math.max(.6,1-(h-20)*.4)}
+function cloudLevel(){if(!S||S.day!==2)return 0;return Math.max(0,Math.min(1,(S.t/60-10)/5))}
+
 // ---------- time & stats ----------
 function advance(m){
   S.t+=m;
+  if(S.day===2){
+    const h=S.t/60,M=S.stormMsgs,say=(k,msg)=>{if(!M[k]){M[k]=1;log(msg);return true}return false};
+    if(h>=11)say('a','바람이 거세진다. 나뭇가지가 휘청인다.');
+    if(h>=13.5)say('b','서쪽 하늘이 시커멓다. 곧 쏟아질 것 같다.');
+    if(h>=15&&say('c','후드득— 비가 쏟아지기 시작했다!')&&S.fire){S.fire=false;log('비가 모닥불을 꺼 버렸다.')}
+    if(h>=15.5&&say('d','빗물통에 빗물이 차오르는 소리가 들린다.'))S.barrelFull=true;
+    if(h>=16)say('e','폭풍이다. 바람이 쉼터를 통째로 흔든다.');
+  }
+  if(S.day>=2){
+    const st=stormLevel(),inside=inShelter();let loss=0,gain=0;
+    if(st>0&&!inside){loss+=.35*st;if(!S.wet&&st>.2){S.wet=true;S.wasWet=true;log('비에 흠뻑 젖었다. 몸이 빠르게 식는다.')}}
+    else if(st>0){loss+=st*((S.prep.roof?0:.12)+(S.prep.door?0:.08)+(S.prep.floor?0:.07));
+      if(!S.prep.roof&&st>.5&&!S.wet&&Math.random()<.003*m){S.wet=true;S.wasWet=true;log('지붕 구멍으로 쏟아진 빗물에 옷이 다 젖었다.')}}
+    else if(!inside&&S.t>=11*60)loss+=.03;
+    if(S.wet)loss+=.12;
+    if(inside&&!S.wet&&(st===0||(S.prep.roof&&S.prep.door&&S.prep.floor)))gain+=.06;
+    S.warm=Math.max(0,Math.min(100,S.warm+(gain-loss)*m));
+    if(S.warm<=0)S.hp-=.1*m;
+    if(S.warm<30)S.mind-=.03*m;
+  }
   S.water-=0.035*m; S.food-=0.022*m; S.mind-=0.012*m;
   if(S.sick)S.hp-=0.012*m;
   if(S.water<=0){S.water=0;S.hp-=0.05*m}
@@ -260,13 +313,36 @@ function advance(m){
 }
 function doAction(a){
   if(!S.running||!a||!a.ok)return;
+  const sn=SND.find(([k])=>a.label.includes(k));if(sn)Sfx.play(sn[1]);
   a.fn();
   if(S.running)advance(a.cost);else if(!S.ended)S.t+=a.cost;
   dirtyUI=true;
 }
 
 // ---------- monologue (soft guidance) ----------
+function monologue2(){
+  const I=S.inv,P=S.prep;let s;
+  if(S.t<15*60){
+    if(!P.roof)s=I.metal>=2?'함석판이 있다. 쉼터 안에서 지붕 틈을 막자.':`지붕에 구멍이 났다. 무너진 건물에서 함석판을 뜯어 오자. (${I.metal}/2)`;
+    else if(!P.floor)s=I.grass>=2?'마른 풀을 쉼터 바닥에 깔자. 땅이 체온을 빼앗는다.':`바닥이 차다. 강가 풀밭에서 마른 풀을 베어 오자. (${I.grass}/2)`;
+    else if(!P.door)s=I.blanket?'담요를 입구에 걸어 바람을 막자.':'입구로 바람이 들이친다. 차 뒷좌석에 담요가 있었던 것 같다.';
+    else if(!S.storedWood)s=I.wood?'땔감을 쉼터 안에 들여놓자. 젖으면 내일 불을 못 피운다.':'마른 땔감을 미리 주워 쉼터 안에 들여놓자.';
+    else s='준비는 끝났다. 비가 오기 전에 물과 먹을 것도 챙겨 두자.';
+    if(S.t>=13.5*60)s='먹구름이 몰려온다. 서둘러야 한다. '+s;
+  }else{
+    if(!inShelter())s='비가 쏟아진다! 쉼터로 돌아가자.';
+    else if(S.wet)s='온몸이 젖었다. 젖은 옷부터 벗어 말려야 한다.';
+    else if(!P.roof)s='지붕에서 물이 샌다. 오늘 밤은 길 것 같다.';
+    else if(!P.floor||!P.door)s='바닥과 입구로 냉기가 스민다. 몸을 웅크리자.';
+    else s='빗소리가 지붕을 두드린다. 여기 있으면 괜찮다.';
+    const np=FINDS.find(f=>f.id==='newspaper');if(visible(np)&&!S.found.newspaper)s+=' 문 앞에 뭔가 날아와 붙었다.';
+  }
+  if(S.carry.length&&S.t<15*60)s+=' 배낭 속 물건은 쉼터에 가져다 두자.';
+  const ck=v=>v?'✓':'✗';
+  return {s,count:`대비 — 지붕 ${ck(P.roof)} · 바닥 ${ck(P.floor)} · 입구 ${ck(P.door)} · 땔감 ${ck(S.storedWood)}`};
+}
 function monologue(){
+  if(S.day===2)return monologue2();
   const I=S.inv,mem=FINDS.filter(f=>f.kind==='mem'&&S.found[f.id]).length;
   let s;
   if(S.t>=18*60)s='해가 기운다. 이제 쉼터로 돌아가 쉬자.';
@@ -278,7 +354,7 @@ function monologue(){
   else if(!S.drankClean&&I.bw==='dirty')s='불이 있다. 끓이면 마실 수 있을 것이다.';
   else if(!S.drankClean&&I.bw)s='물이 있다. 목부터 축이자.';
   else if(!S.fire&&S.t>=15*60)s='밤이 오기 전에 불을 피워 두고 싶다.';
-  else if(mem<MEM_TOTAL)s=mem===0?'목은 축였다. 해가 지기 전까지 천천히 걸어 보자. 여기저기 반짝이는 게 있다.':'이 근처에 누가 살았던 걸까. 조금 더 걸어 보자.';
+  else if(mem<memTotal())s=mem===0?'목은 축였다. 해가 지기 전까지 천천히 걸어 보자. 여기저기 반짝이는 게 있다.':'이 근처에 누가 살았던 걸까. 조금 더 걸어 보자.';
   else s='오늘은 많이 걸었다. 쉼터로 돌아가 쉬자.';
   if(S.carry.length&&S.t<18*60)s+=' 배낭 속 물건은 쉼터에 가져다 두자.';
   return {s,mem};
@@ -303,7 +379,7 @@ cv.addEventListener('pointerdown',e=>{
 
 // ---------- UI ----------
 const statsEl=document.getElementById('stats'),invEl=document.getElementById('invList'),actEl=document.getElementById('actions'),logEl=document.getElementById('log'),clockEl=document.getElementById('clock'),sayEl=document.getElementById('say'),countEl=document.getElementById('count');
-const STATS=[['hp','체력','#d9604c'],['food','식량','#d8a347'],['water','물','#4f9fd6'],['mind','정신력','#a98bd9']];
+const STATS=[['hp','체력','#d9604c'],['food','식량','#d8a347'],['water','물','#4f9fd6'],['warm','체온','#e8875a'],['mind','정신력','#a98bd9']];
 statsEl.innerHTML=STATS.map(([k,n,c])=>`<div class="stat px"><div class="row">${n}<b id="v_${k}">0</b></div><div class="bar"><i id="b_${k}" style="background:${c}"></i></div></div>`).join('');
 let currentActions=[],lastActKey='',dirtyUI=true,lastSay='';
 function log(m){const p=document.createElement('p');p.textContent=`[${fmt(S.t)}] ${m}`;logEl.prepend(p)}
@@ -313,7 +389,7 @@ function renderUI(){
   clockEl.textContent=fmt(S.t);
   const m=monologue();
   if(m.s!==lastSay){lastSay=m.s;sayEl.textContent='💭 '+m.s}
-  countEl.textContent=`발견한 기억 ${m.mem}/${MEM_TOTAL}`;
+  countEl.textContent=m.count||`발견한 기억 ${m.mem}/${memTotal()}`;
   const I=S.inv,items=[];
   if(I.bottle)items.push(iconImg('bottle',14)+' '+({boiled:'끓인 물',rain:'빗물',filtered:'걸러낸 물',dirty:'탁한 물'}[I.bw]||'빈 병'));
   if(I.wood)items.push(iconImg('wood',14)+' 땔감 ×'+I.wood);
@@ -322,7 +398,11 @@ function renderUI(){
   if(I.cray)items.push(iconImg('cray',14)+' 가재 ×'+I.cray);
   if(I.can)items.push(iconImg('can',14)+' 통조림 ×'+I.can);
   for(const id of S.carry){const f=FINDS.find(x=>x.id===id);items.push(iconImg(id,14)+' '+f.name)}
+  if(I.metal)items.push(iconImg('metal',14)+' 함석판 ×'+I.metal);
+  if(I.grass)items.push(iconImg('grass',14)+' 마른 풀 ×'+I.grass);
+  if(I.blanket)items.push(iconImg('blanket',14)+' 담요');
   if(S.sick)items.push('⚠ 배탈');
+  if(S.wet)items.push('💧 젖음');
   invEl.innerHTML=items.length?items.map(t=>`<span class="item">${t}</span>`).join(''):'<span style="color:var(--dim)">비어 있음</span>';
   const o=nearPOI();currentActions=actionsFor(o).concat(drinkActions());
   const key=(o?(o.id+(o.find?o.find.id:'')):'')+'|'+currentActions.map(a=>a.label+a.ok).join(',')+'|'+I.can;
@@ -380,6 +460,11 @@ const ICON={
   wood:sprite(['.......','......t','....tt.','..ltt..','.ltt...','tt.....','.......'],{t:'#6a4a2c',l:'#9a7a50'}),
   cloth:sprite(['.......','.ccccc.','.cdcdc.','.ccccc.','.cdcdc.','.ccccc.','.......'],{c:'#a04040',d:'#7a2f2f'}),
   lighter:sprite(['...f...','..mm...','..rr...','..rr...','..rr...','..rr...','.......'],{f:'#f4c14e',m:'#bbbbbb',r:'#d04030'}),
+  metal:sprite(['.......','mmmmmmm','dMdMdMd','mmmmmmm','dMdMdMd','mmmmmmm','.......'],{m:'#a4aaae',M:'#7b8186',d:'#5a5f63'}),
+  grass:sprite(['..y.y..','.yy.yy.','y.yyy.y','.yyyyy.','..yYy..','..YYY..','.......'],{y:'#d8b860',Y:'#a88a40'}),
+  blanket:sprite(['bbbbbbb','bkbkbkb','bbbbbbb','bkbkbkb','bbbbbbb','bkbkbkb','.......'],{b:'#8a5040',k:'#5a3428'}),
+  umbrella:sprite(['..yyy..','.yyyyy.','yyyyyyy','y..h..y','...h...','...h...','..hh...'],{y:'#e8c840',h:'#6a5a48'}),
+  newspaper:sprite(['ggggggg','gkkgkkg','ggggggg','gkgkkkg','ggggggg','gkkkgkg','ggggggg'],{g:'#d8d2c0',k:'#6a6a6a'}),
   cray:sprite(['.r...r.','rr...rr','.rrrrr.','..rrr..','..rdr..','..rrr..','...r...'],{r:'#c04a30',d:'#8a3020'}),
 };
 const MINI={};for(const k in ICON)MINI[k]=mini(ICON[k]);
@@ -464,7 +549,7 @@ function makeCar(open){const c=document.createElement('canvas');c.width=20;c.hei
   return c}
 const CAR=makeCar(false),CAR_OPEN=makeCar(true);
 
-const SHELF=[[96,48],[101,48],[87,59],[93,59],[99,59],[106,61]];
+const SHELF=[[96,48],[101,48],[87,59],[93,59],[99,59],[106,61],[88,54],[101,54]];
 const drawAt=(img,wx,wy)=>lc.drawImage(img,Math.round(wx/SC-img.width/2),Math.round(wy/SC-img.height));
 
 function draw(now){
@@ -478,6 +563,16 @@ function draw(now){
   lc.drawImage(BUSH,79,71);
   if(S.bush<2){lc.fillStyle='#d03a4e';[[81,73],[85,72],[86,76],[82,77],[84,74],[80,75]].slice(0,S.bush?3:6).forEach(([x,y])=>px(lc,x,y))}
   if(S.rock){lc.fillStyle='#4a3e2c';lc.fillRect(148,82,5,3);lc.drawImage(ROCK,152,81)}else lc.drawImage(ROCK,148,79);
+  // day-2 world details
+  if(S.day>=2){
+    if(S.metalLeft>0){for(let i=0;i<8;i++){lc.fillStyle=i%2?'#7b8186':'#a4aaae';lc.fillRect(47+i,15,1,4+(S.metalLeft>1?1:0))}}
+    seed=77;for(let i=0;i<14;i++){const gx=124+(rnd()*14|0),gy=93+(rnd()*8|0);const tall=i<S.grassLeft*5;lc.fillStyle=tall?(i%3?'#d8b860':'#b8963e'):'#7a6a3a';lc.fillRect(gx,gy-(tall?3:0),1,tall?4:1)}
+  }
+  if(S.prep.roof){lc.fillStyle='#9aa0a4';lc.fillRect(90,44,20,2);lc.fillStyle='#6e7478';for(let x=90;x<110;x+=2)px(lc,x,45)}
+  if(S.prep.floor){seed=91;lc.fillStyle='#c8a85a';for(let i=0;i<40;i++)px(lc,86+(rnd()*28|0),56+(rnd()*9|0))}
+  if(S.prep.door){lc.fillStyle='#8a5040';lc.fillRect(96,63,8,4);lc.fillStyle='#5a3428';for(let x=96;x<104;x+=2)px(lc,x,64,1,3)}
+  if(S.storedWood){lc.fillStyle='#6a4a2c';lc.fillRect(110,61,4,1);lc.fillRect(110,63,4,1);lc.fillStyle='#9a7a50';px(lc,110,62,4,1)}
+  if(S.barrelFull){lc.fillStyle='#6fa3c4';lc.fillRect(120,71,4,1)}
   // fire
   if(S.fire){const f=(now/110|0);seed=f*31+7;const hs=[2,4,5,4,2];
     hs.forEach((h,i)=>{const hh=h+((rnd()*2)|0);for(let k=0;k<hh;k++){lc.fillStyle=k<2?'#c8462a':k<hh-1?'#e88a2e':'#f4d060';px(lc,98+i,85-k)}});
@@ -495,6 +590,14 @@ function draw(now){
   lc.fillStyle='rgba(0,0,0,.35)';lc.fillRect(Math.round(p.x/SC)-2,Math.round(p.y/SC)+2,5,1);
   drawAt(ps,p.x,p.y+12);
   for(const t of trees)if(t.y>p.y)drawAt(t.c,t.x,t.y+8);
+  // weather
+  const st=stormLevel(),cl=cloudLevel();
+  if(cl>0){lc.fillStyle=`rgba(40,46,60,${cl*.28})`;lc.fillRect(0,0,LW,LH)}
+  if(st>0){
+    if(!S.prep.roof){lc.fillStyle='#7fb2d4';for(let i=0;i<4;i++){const dy=((now/60+i*9)%18)|0;px(lc,95+i*5,48+dy)}}
+    lc.fillStyle='rgba(170,195,220,.55)';const n=(170*st)|0;
+    for(let i=0;i<n;i++){const x=((i*37+now/3.2)%(LW+30))-15|0,y=((i*53+now/1.6)%(LH+10))-5|0;px(lc,x,y);px(lc,x-1,y+1);px(lc,x-2,y+2)}
+  }
   // target marker
   if(S.target){lc.fillStyle='rgba(255,255,255,.6)';const tx=Math.round(S.target.x/SC),ty=Math.round(S.target.y/SC);px(lc,tx-1,ty);px(lc,tx+1,ty);px(lc,tx,ty-1);px(lc,tx,ty+1)}
   // daylight
@@ -502,6 +605,7 @@ function draw(now){
   if(h<7)a=.45*(7-h);
   if(h>=16&&h<18.5){lc.fillStyle=`rgba(230,120,50,${(h-16)/2.5*.18})`;lc.fillRect(0,0,LW,LH)}
   if(h>=17.5)a=Math.min(.8,(h-17.5)/3.5*.8);
+  a=Math.max(a,st*.42);
   if(a>0){
     const lights=[[p.x/SC,p.y/SC,14]];if(S.fire)lights.push([100,85,38+Math.sin(now/120)]);
     const d=dimg.data;
@@ -515,9 +619,12 @@ function draw(now){
     }
     dctx.putImageData(dimg,0,0);lc.drawImage(dark,0,0);
   }
+  // lightning
+  if(st>.6&&now-S.flash>2500&&Math.random()<.004){S.flash=now;Music.thunder()}
+  if(now-S.flash<90||(now-S.flash>160&&now-S.flash<210)){lc.fillStyle='rgba(235,240,255,.55)';lc.fillRect(0,0,LW,LH)}
   // glints of undiscovered things (above the dark, so they can be found at dusk)
   FINDS.forEach((f,i)=>{
-    if(S.found[f.id])return;
+    if(S.found[f.id]||!visible(f))return;
     const tw=Math.sin(now/380+i*1.7),x=Math.round(f.x/SC),y=Math.round(f.y/SC);
     lc.fillStyle=tw>-.3?'#fff6d8':'#b8ae90';px(lc,x,y);
     if(tw>.2){lc.fillStyle='rgba(255,246,216,.75)';px(lc,x-1,y);px(lc,x+1,y);px(lc,x,y-1);px(lc,x,y+1)}
@@ -553,7 +660,7 @@ function frame(now){
     S._walk=!!(dx||dy);
     if(dx||dy){
       const l=Math.hypot(dx,dy),sp=.15*dt;
-      p.x+=dx/l*sp;p.y+=dy/l*sp;if(dx)p.face=dx>0?1:-1;p.step+=dt/140;
+      p.x+=dx/l*sp;p.y+=dy/l*sp;if(dx)p.face=dx>0?1:-1;const ps0=Math.floor(p.step);p.step+=dt/140;if(Math.floor(p.step)!==ps0&&Math.floor(p.step)%2===0)Sfx.play('step',inShelter()?'wood':stormLevel()>.2?'splash':'grass');
       p.x=Math.max(14,Math.min(645,p.x));p.y=Math.max(22,Math.min(H-14,p.y));
     }
     if(inShelter())placeCarried();
@@ -580,7 +687,7 @@ const Music=(()=>{
     const verb=ac.createConvolver();verb.buffer=impulse(5);const wet=ac.createGain();wet.gain.value=.6;verb.connect(wet);wet.connect(master);
     const dry=ac.createGain();dry.gain.value=.45;dry.connect(master);
     tone=ac.createBiquadFilter();tone.type='lowpass';tone.frequency.value=2400;tone.connect(dry);tone.connect(verb);
-    wind();
+    wind();rainNode();
     nextBar=ac.currentTime+.3;
     timer=setInterval(schedule,250);schedule();
     if(on)master.gain.linearRampToValueAtTime(VOL,ac.currentTime+5);
@@ -589,6 +696,7 @@ const Music=(()=>{
     if(!ac)return;
     const night=S&&S.t>=18*60;
     tone.frequency.setTargetAtTime(night?1100:2400,ac.currentTime,3);
+    if(rainG){const st=S?stormLevel():0,inside=S&&inShelter();rainG.gain.setTargetAtTime(st*(inside?.07:.13),ac.currentTime,1.5);rainLP.frequency.setTargetAtTime(inside?1400:5000,ac.currentTime,.5)}
     while(nextBar<ac.currentTime+1.5){playBar(nextBar,bar,night);nextBar+=BAR;bar++}
   }
   function playBar(t,n,night){
@@ -625,6 +733,24 @@ const Music=(()=>{
     const g=ac.createGain();g.gain.value=.05;
     src.connect(bp);bp.connect(g);g.connect(master);src.start();lfo.start();
   }
+  let rainG,rainLP;
+  function rainNode(){
+    const len=ac.sampleRate*2,b=ac.createBuffer(1,len,ac.sampleRate),d=b.getChannelData(0);for(let i=0;i<len;i++)d[i]=Math.random()*2-1;
+    const src=ac.createBufferSource();src.buffer=b;src.loop=true;
+    const hp=ac.createBiquadFilter();hp.type='highpass';hp.frequency.value=700;
+    rainLP=ac.createBiquadFilter();rainLP.type='lowpass';rainLP.frequency.value=5000;
+    rainG=ac.createGain();rainG.gain.value=0;
+    src.connect(hp);hp.connect(rainLP);rainLP.connect(rainG);rainG.connect(master);src.start();
+  }
+  function thunder(){
+    if(!ac||!on)return;
+    const t=ac.currentTime+.3+Math.random()*1.2,len=ac.sampleRate*4,b=ac.createBuffer(1,len,ac.sampleRate),d=b.getChannelData(0);
+    let l=0;for(let i=0;i<len;i++){l=(l+(Math.random()*2-1)*.08)*.985;d[i]=l*4}
+    const src=ac.createBufferSource();src.buffer=b;
+    const lp=ac.createBiquadFilter();lp.type='lowpass';lp.frequency.value=260;
+    const g=ac.createGain();g.gain.setValueAtTime(0,t);g.gain.linearRampToValueAtTime(.7,t+.08);g.gain.exponentialRampToValueAtTime(.001,t+3.8);
+    src.connect(lp);lp.connect(g);g.connect(master);src.start(t);
+  }
   // a short, slightly broken music-box phrase that stops before it resolves
   function musicBox(){
     if(!ac||!on)return;
@@ -646,33 +772,88 @@ const Music=(()=>{
     on=v;if(!ac)return;
     const now=ac.currentTime;master.gain.cancelScheduledValues(now);master.gain.setValueAtTime(master.gain.value,now);master.gain.linearRampToValueAtTime(v?VOL:0,now+1.2);
   }
-  return{start,setOn,musicBox,get on(){return on}};
+
+  // ---------- sound effects (synthesized) ----------
+  let sfxOut,noiseBuf;
+  function sfxInit(){if(sfxOut||!ac)return;sfxOut=ac.createGain();sfxOut.gain.value=.9;sfxOut.connect(ac.destination);
+    const len=ac.sampleRate;noiseBuf=ac.createBuffer(1,len,ac.sampleRate);const d=noiseBuf.getChannelData(0);for(let i=0;i<len;i++)d[i]=Math.random()*2-1}
+  function env(g,t,a,peak,dec){g.gain.setValueAtTime(0,t);g.gain.linearRampToValueAtTime(peak,t+a);g.gain.exponentialRampToValueAtTime(.0001,t+a+dec)}
+  function noise(t,dur,type,freq,q,peak,a=.005){const src=ac.createBufferSource();src.buffer=noiseBuf;src.loop=true;const f=ac.createBiquadFilter();f.type=type;f.frequency.value=freq;f.Q.value=q;const g=ac.createGain();env(g,t,a,peak,dur);src.connect(f);f.connect(g);g.connect(sfxOut);src.start(t,Math.random()*.5);src.stop(t+a+dur+.05);return f}
+  function tone2(t,f,dur,peak,type='sine',glide=0,a=.004){const o=ac.createOscillator();o.type=type;o.frequency.setValueAtTime(f,t);if(glide)o.frequency.exponentialRampToValueAtTime(glide,t+dur);const g=ac.createGain();env(g,t,a,peak,dur);o.connect(g);g.connect(sfxOut);o.start(t);o.stop(t+a+dur+.05)}
+  const SFX={
+    step:{grass:t=>noise(t,.05,'bandpass',1700,1.2,.05),wood:t=>{tone2(t,170,.06,.06,'sine',110);noise(t,.03,'lowpass',600,1,.03)},splash:t=>{noise(t,.07,'bandpass',2400,.8,.06);noise(t,.04,'lowpass',500,1,.03)}},
+    pick:t=>{tone2(t,1318,.18,.07);tone2(t+.08,1976,.3,.06)},
+    find:t=>{[1046,1318,1568].forEach((f,i)=>tone2(t+i*.07,f,.7,.045))},
+    leave:t=>tone2(t,523,.6,.05),
+    place:t=>{tone2(t,240,.08,.12,'sine',160);tone2(t+.06,1568,.4,.035)},
+    rustle:t=>{for(let i=0;i<5;i++)noise(t+i*.045+Math.random()*.02,.07,'bandpass',2200+Math.random()*1500,.7,.05)},
+    wood:t=>{tone2(t,140,.12,.14,'sine',90);tone2(t+.12,170,.1,.1,'sine',100);noise(t,.06,'lowpass',800,1,.05)},
+    metal:t=>{[523,1347,2211,3080].forEach((f,i)=>tone2(t,f,.9-i*.15,.06/(i+1),'triangle'));noise(t,.12,'highpass',2500,.7,.06)},
+    water:t=>{for(let i=0;i<9;i++){const f=300+Math.random()*500;tone2(t+i*.06+Math.random()*.03,f,.06,.05,'sine',f*1.8)}},
+    drink:t=>{tone2(t,220,.12,.1,'sine',130);tone2(t+.22,200,.12,.09,'sine',120)},
+    eat:t=>{for(let i=0;i<3;i++)noise(t+i*.16,.06,'bandpass',1200+Math.random()*600,1.5,.07)},
+    fire:t=>{noise(t,.5,'lowpass',900,.7,.06,.08);for(let i=0;i<10;i++)noise(t+Math.random()*1.1,.015,'highpass',3000,.5,.09)},
+    boil:t=>{for(let i=0;i<14;i++){const f=150+Math.random()*220;tone2(t+i*.07+Math.random()*.04,f,.05,.05,'sine',f*1.6)}},
+    cloth:t=>{noise(t,.3,'lowpass',1400,.6,.06,.08);noise(t+.25,.2,'lowpass',1000,.6,.04,.05)},
+    radio:t=>{const f=noise(t,.9,'bandpass',1500,2,.05,.02);f.frequency.setValueAtTime(900,t);f.frequency.linearRampToValueAtTime(2600,t+.9)},
+    rock:t=>{tone2(t,90,.25,.18,'sine',55);noise(t+.05,.25,'lowpass',500,1,.06,.03)},
+    car:t=>{tone2(t,160,.45,.05,'sawtooth',95,.05);noise(t,.4,'bandpass',700,3,.03,.05);tone2(t+.45,110,.15,.12,'sine',70)},
+    start:t=>{tone2(t,523,.5,.04);tone2(t+.15,784,.8,.04)},
+    night:t=>{[220,277,330,440].forEach((f,i)=>tone2(t+i*.12,f,2.2,.03,'triangle',0,.3))},
+    fall:t=>{[392,330,262,196].forEach((f,i)=>tone2(t+i*.25,f,.9,.05,'triangle'))},
+  };
+  function sfx(name,arg){if(!ac)return;sfxInit();const t=ac.currentTime+.01;const f=SFX[name];if(!f)return;try{typeof f==='function'?f(t):f[arg]&&f[arg](t)}catch(e){}}
+  return{start,setOn,musicBox,thunder,sfx,get on(){return on}};
 })();
+const Sfx={play:(n,a)=>Music.sfx(n,a)};
+const SND=[['함석','metal'],['지붕','metal'],['풀','rustle'],['덤불','rustle'],['가지','rustle'],['구워','eat'],['담요','cloth'],['옷','cloth'],['마시기','drink'],['걸러','water'],['담기','water'],['들여다','water'],['불 피우기','fire'],['끓이','boil'],['라디오','radio'],['바위','rock'],['트렁크','car'],['운전석','car'],['땔감','wood'],['살펴보기','find']];
 const muteBtn=document.getElementById('mute');
 muteBtn.onclick=()=>{Music.start();Music.setOn(!Music.on);muteBtn.textContent=Music.on?'♪ 음악 켜짐':'♪ 음악 꺼짐';muteBtn.blur()};
 
 // ---------- screens ----------
 const ov=document.getElementById('ov'),card=document.getElementById('ovCard');
-function intro(){
-  S=fresh();logEl.innerHTML='';dirtyUI=true;lastSay='';
-  card.innerHTML=`<h2>마지막 사람</h2><div class="sub">멸망 후 50년 · 1일차</div>
+const DAYS={
+  1:{theme:'물이 탁해졌다',wake:'눈을 떴다. 목이 마르다.',
+     intro:()=>`<h2>마지막 사람</h2><div class="sub">멸망 후 50년 · 1일차 — 물이 탁해졌다</div>
   <p>마지막으로 사람 목소리를 들은 게 언제였는지 기억나지 않는다. 도시는 숲이 되었고, 나는 강가의 작은 쉼터에서 하루하루를 지낸다.</p>
   <p>어젯밤 비가 그친 뒤로 강물이 흙빛이다. 마실 물을 구해야 한다.<br>그리고 오늘은, 조금 멀리까지 걸어 볼 생각이다.</p>
-  <p class="small">✦ 반짝이는 곳에는 50년 전의 물건이 있습니다. 가져가서 쉼터에 둘 수도, 그 자리에 둘 수도 있어요.<br>자동차, 빗물통, 덤불, 바위처럼 주변 사물에 다가가면 만져 볼 수 있어요. 쓸모 있는 물건이 나오기도 합니다.<br>물을 얻는 방법은 하나가 아닙니다.<br>위쪽의 💭 혼잣말이 다음에 할 일을 넌지시 알려 줍니다.<br>이동: WASD·방향키 또는 화면 탭 · 행동: Space·숫자키 또는 버튼</p>
-  <button id="go">하루 시작하기</button>`;
-  ov.classList.remove('hide');
-  document.getElementById('go').onclick=()=>{Music.start();ov.classList.add('hide');S.running=true;log('눈을 떴다. 목이 마르다.');renderUI()};
+  <p class="small">✦ 반짝이는 곳에는 50년 전의 물건이 있습니다. 가져가서 쉼터에 둘 수도, 그 자리에 둘 수도 있어요.<br>자동차, 빗물통, 덤불, 바위처럼 주변 사물에 다가가면 만져 볼 수 있어요.<br>물을 얻는 방법은 하나가 아닙니다. 위쪽 💭 혼잣말이 넌지시 알려 줍니다.<br>이동: WASD·방향키 또는 화면 탭 · 행동: Space·숫자키 또는 버튼</p>`},
+  2:{theme:'폭풍이 온다',wake:'눈을 떴다. 바람 소리가 심상치 않다.',
+     intro:()=>`<h2>2일차</h2><div class="sub">폭풍이 온다</div>
+  <p>아침부터 바람 냄새가 다르다. 하늘 한쪽이 무겁게 내려앉았다.<br>오후 세 시쯤이면 폭풍이 들이닥칠 것이다.</p>
+  <p>그 전에 쉼터를 손봐야 한다. <b>지붕의 구멍</b>, <b>차가운 바닥</b>, <b>바람이 들이치는 입구</b>.</p>
+  <p class="small">새로 생긴 수치 <b style="color:#e8875a">체온</b> — 비에 젖거나 바람을 맞으면 떨어지고, 0이 되면 체력이 줄어요.<br>폭풍이 오면 밖에 오래 있지 마세요. 젖으면 쉼터에서 옷을 말려야 합니다.<br>함석판, 마른 풀, 담요… 필요한 건 주변 어딘가에 있습니다.</p>`},
+};
+const NOTES={
+  1:{title:'식수 만들기',body:['흙탕물은 먼저 천에 걸러 흙과 찌꺼기를 뺀다. 거르기만 해서는 세균이 남는다.','팔팔 끓는 상태로 1분 이상 끓인다. (높은 산에서는 3분)','빗물은 비교적 깨끗하지만, 깨끗한 그릇에 받아야 한다.','모르는 물은 그냥 마시지 않는다. 배탈이 나면 몸의 물이 더 빠져나간다.'],
+     did:()=>({boiled:'끓이기',rain:'빗물 받기',filtered:'천으로 거르기',dirty:'그냥 마시기 (다음엔 끓이자)'}[S.lastDrink]||(S.drankRiver?'그냥 마시기 (다음엔 끓이자)':'아직 못 해 봄'))},
+  2:{title:'쉼터와 체온',body:['젖은 몸은 마른 몸보다 훨씬 빨리 식는다. 물은 공기보다 열을 훨씬 잘 빼앗기 때문이다.','땅바닥은 누운 몸의 열을 빼앗는다. 잠자리 밑에 마른 풀이나 나뭇잎을 두껍게 깐다.','바람은 체온을 빼앗는다. 지붕과 벽의 틈, 입구를 막는다.','젖었으면 바로 마른 옷으로 갈아입는다.','마른 땔감은 비 맞기 전에 지붕 아래로 들여놓는다.'],
+     did:()=>{const ck=v=>v?'✓':'✗';return `지붕 ${ck(S.prep.roof)} · 바닥 ${ck(S.prep.floor)} · 입구 ${ck(S.prep.door)} · 땔감 ${ck(S.storedWood)}${S.wasWet?' · 비에 젖어 봄':''}`}},
+};
+const titleEl=document.getElementById('title'),themeEl=document.getElementById('themeTxt');
+let dayStart=null;
+function startDay(n){
+  if(n===1)S=fresh();
+  else{
+    S.day=n;S.t=360;S.ended=false;S.running=false;S.warnedDark=false;S.stormMsgs={};
+    S.water=Math.max(15,S.water-12);S.food=Math.max(15,S.food-10);S.hp=Math.min(100,S.hp+10);S.mind=Math.max(20,S.mind);
+    S.sick=false;S.fire=false;S.bush=0;S.rock=false;S.barrel=true;S.barrelFull=false;
+    S.warm=80;S.wet=false;S.p={x:400,y:236,face:1,step:0};S.target=null;S.carry.forEach(id=>{S.found[id]='placed';S.placedOrder.push(id)});S.carry=[];
+  }
+  dayStart=JSON.stringify(S);
+  beginDay();
 }
-function endDay(forced){
-  if(S.ended)return;
-  if(inShelter())placeCarried();
-  S.ended=true;S.running=false;
-  const home=inShelter();
-  if(forced&&!home){S.mind=Math.max(0,S.mind-8)}
-  const st=id=>S.found[id];
-  const placed=FINDS.filter(f=>st(f.id)==='placed'), left=FINDS.filter(f=>st(f.id)==='left');
-  const has=id=>st(id)==='placed'||st(id)==='taken';
-  const seen=id=>!!st(id);
+function retryDay(){S=JSON.parse(dayStart);beginDay()}
+function beginDay(){
+  const D=DAYS[S.day];
+  logEl.innerHTML='';dirtyUI=true;lastSay='';
+  titleEl.textContent=`마지막 사람 · ${S.day}일차`;themeEl.textContent='오늘의 주제 — '+D.theme;
+  card.innerHTML=D.intro()+`<div class="btns"><button id="go">하루 시작하기</button></div>`;
+  ov.classList.remove('hide');
+  document.getElementById('go').onclick=()=>{Music.start();Sfx.play('start');ov.classList.add('hide');S.running=true;log(D.wake);renderUI()};
+}
+function journal1(forced,home){
+  const st=id=>S.found[id],has=id=>st(id)==='placed'||st(id)==='taken',seen=id=>!!st(id);
   const L=['1일차.'];
   if(S.lastDrink==='rain')L.push('강물이 흙빛이었다. 다행히 통에 빗물이 고여 있었다. 하늘이 한 번 봐준 셈이다.');
   else if(S.lastDrink==='filtered')L.push('강물이 흙빛이었다. 차에서 찾은 헝겊으로 걸러 마셨다. 흙맛은 났지만 버틸 만했다.');
@@ -682,34 +863,69 @@ function endDay(forced){
   if(has('shoe'))L.push('작은 운동화를 문가에 두었다. 끈 한쪽은 풀린 채로.');
   if(has('watch'))L.push('멈춘 시계를 벽에 걸었다. 4시 17분. 이제 이 방에도 그 시간이 있다.');
   if(has('musicbox'))L.push('오르골을 머리맡에 두었다. 잠들기 전에 한 번 더 감아 볼 생각이다.');
-  if((seen('letter')||seen('drawing'))&&(seen('letter')&&seen('drawing')))L.push('편지와 그림 속 아이의 이름은 수아. 몇 번이고 소리 내어 불러 봤다. 이상하게, 입에 익었다.');
+  if(seen('letter')&&seen('drawing'))L.push('편지와 그림 속 아이의 이름은 수아. 몇 번이고 소리 내어 불러 봤다. 이상하게, 입에 익었다.');
   else if(seen('letter'))L.push('편지 속 아이의 이름은 수아였다. 아빠는 먼저 북쪽으로 갔다고 했다.');
   else if(seen('drawing'))L.push('그림 속 가장 작은 사람, 수아. 누구였을까.');
   const north=[S.signal&&'라디오',seen('letter')&&'편지',seen('sign')&&'표지판'].filter(Boolean);
   if(north.length>=2)L.push(`${north.join('에도, ')}에도 '북쪽'이 있었다.`);
   else if(seen('sign'))L.push('북쪽 대피소 행 막차, 18시. 막차는 왔을까.');
-  if(left.length)L.push('두고 온 것도 있다. 내일 다시 보러 가도 될 것이다.');
+  if(FINDS.some(f=>st(f.id)==='left'))L.push('두고 온 것도 있다. 내일 다시 보러 가도 될 것이다.');
   if(forced&&!home)L.push('어둠 속에서 길을 잃을 뻔했다. 겨우 쉼터로 돌아왔다.');
-  const memCount=FINDS.filter(f=>f.kind==='mem'&&seen(f.id)).length;
-  if(memCount===0)L.push('오늘은 물만 생각했다. 쉼터가 여전히 휑하다.');
-  card.innerHTML=`<h2>밤 — 생존 일지</h2><div class="sub">발견한 기억 ${memCount}/${MEM_TOTAL}</div>
+  if(!FINDS.some(f=>f.kind==='mem'&&seen(f.id)))L.push('오늘은 물만 생각했다. 쉼터가 여전히 휑하다.');
+  return L;
+}
+function journal2(forced,home){
+  const P=S.prep,seen=id=>!!S.found[id];
+  const L=['2일차.'];
+  if(P.roof&&P.floor&&P.door)L.push('지붕을 막고, 바닥에 풀을 깔고, 입구에 담요를 걸었다. 바깥은 폭풍인데 안은 견딜 만했다.');
+  else{
+    if(!P.roof)L.push('지붕 구멍으로 밤새 빗물이 떨어졌다. 구석에 웅크려 겨우 잤다.');
+    if(!P.floor)L.push('바닥에서 냉기가 올라왔다. 땅이 이렇게 차가운 줄 몰랐다.');
+    if(!P.door)L.push('입구로 바람이 계속 들이쳤다.');
+  }
+  if(S.wasWet)L.push('비에 젖은 채로 한참 떨었다. 젖으면 몸이 금방 식는다는 걸 뼈저리게 배웠다.');
+  L.push(S.storedWood?'마른 땔감을 안에 들여놔서 다행이다. 내일 불을 피울 수 있을 것이다.':'땔감이 다 젖었을 것이다. 내일 불 피우기가 걱정이다.');
+  if(S.barrelFull)L.push('빗물통이 가득 찼다. 폭풍도 하나는 주고 갔다.');
+  if(seen('umbrella'))L.push('노란 우산 안쪽에 적힌 이름, 이수아. 3학년 2반.');
+  if(seen('newspaper'))L.push('바람에 날아온 신문 조각. 북부 대피소, 수용 초과. 그럼 수아의 아빠는…');
+  if(forced&&!home)L.push('폭풍 속에서 쉼터를 찾느라 한참을 헤맸다.');
+  return L;
+}
+function endDay(forced){
+  if(S.ended)return;
+  if(inShelter())placeCarried();
+  S.ended=true;S.running=false;Sfx.play('night');
+  const home=inShelter();
+  if(forced&&!home){S.mind=Math.max(0,S.mind-8)}
+  const L=S.day===1?journal1(forced,home):journal2(forced,home);
+  const N=NOTES[S.day];if(!S.notes.includes(S.day))S.notes.push(S.day);
+  const placed=S.placedOrder.map(id=>FINDS.find(f=>f.id===id));
+  const memCount=FINDS.filter(f=>f.kind==='mem'&&S.found[f.id]&&(f.day||1)<=S.day).length;
+  const next=S.day===1
+    ?`<p class="small">내일의 주제 — <b style="color:var(--accent)">2일차: 폭풍이 온다</b></p><div class="btns"><button id="next">2일차로 넘어가기</button><button id="again" class="ghost">1일차 다시 걷기</button></div>`
+    :`<p class="small">내일의 주제 — <b style="color:var(--accent)">3일차: 불씨가 꺼졌다</b> (아직 준비 중)</p><div class="btns"><button id="again">2일차 다시 하기</button><button id="restart" class="ghost">처음부터</button></div>`;
+  card.innerHTML=`<h2>밤 — 생존 일지</h2><div class="sub">${S.day}일차 · 발견한 기억 ${memCount}/${memTotal()}</div>
   <div class="paper">${L.map(l=>`<p>${l}</p>`).join('')}</div>
-  ${placed.length?`<p class="small" style="text-align:center;margin-bottom:0">오늘 밤 쉼터에 놓인 것</p><div class="shelf">${placed.map(f=>iconImg(f.id,42)).join(' ')}</div>`:''}
-  <p class="small">체력 ${Math.round(S.hp)} · 식량 ${Math.round(S.food)} · 물 ${Math.round(S.water)} · 정신력 ${Math.round(S.mind)}</p>
-  <p class="small">다음 날 주제 예고 — <b style="color:var(--accent)">2일차: 폭풍이 온다</b> (프로토타입은 1일차까지)</p>
-  <div class="btns"><button id="again">1일차 다시 걷기</button></div>`;
-  ov.classList.remove('hide');document.getElementById('again').onclick=intro;
+  <div class="note"><div class="nh">📖 생존 수첩 ${S.day}쪽 — ${N.title}</div><ul>${N.body.map(b=>`<li>${b}</li>`).join('')}</ul><div class="did">오늘 직접 해 본 것: ${N.did()}</div></div>
+  ${placed.length?`<p class="small" style="text-align:center;margin-bottom:0">쉼터에 놓인 것</p><div class="shelf">${placed.map(f=>iconImg(f.id,36)).join(' ')}</div>`:''}
+  <p class="small">체력 ${Math.round(S.hp)} · 식량 ${Math.round(S.food)} · 물 ${Math.round(S.water)}${S.day>=2?' · 체온 '+Math.round(S.warm):''} · 정신력 ${Math.round(S.mind)}</p>
+  ${next}`;
+  ov.classList.remove('hide');
+  const $=id=>document.getElementById(id);
+  if($('next'))$('next').onclick=()=>startDay(2);
+  if($('again'))$('again').onclick=retryDay;
+  if($('restart'))$('restart').onclick=()=>startDay(1);
 }
 function gameOver(){
-  if(S.ended)return;S.ended=true;S.running=false;
-  card.innerHTML=`<h2>쓰러졌다</h2><div class="sub">1일차 · ${fmt(S.t)}</div>
+  if(S.ended)return;S.ended=true;S.running=false;Sfx.play('fall');
+  const tip=S.day>=2&&S.warm<=5?'체온이 0이 되면 체력이 줄어든다. 폭풍 전에 쉼터를 보강하고, 젖었으면 옷을 말리자.':'탁한 물을 그냥 마시면 체력이 줄고 배탈이 난다. 물이 0이 되면 체력이 줄어든다.';
+  card.innerHTML=`<h2>쓰러졌다</h2><div class="sub">${S.day}일차 · ${fmt(S.t)}</div>
   <div class="paper"><p>일지의 마지막 장은 비어 있다.</p></div>
-  <p class="small">탁한 물을 그냥 마시면 체력이 줄고 배탈이 난다. 물이 0이 되면 체력이 줄어든다.</p>
-  <div class="btns"><button id="again">다시 하기</button></div>`;
-  ov.classList.remove('hide');document.getElementById('again').onclick=intro;
+  <p class="small">${tip}</p>
+  <div class="btns"><button id="again">${S.day}일차 다시 하기</button></div>`;
+  ov.classList.remove('hide');document.getElementById('again').onclick=retryDay;
 }
-
-intro();
+startDay(1);
 requestAnimationFrame(frame);
 })();
 </script>
