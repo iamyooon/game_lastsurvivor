@@ -124,7 +124,7 @@ function fresh(){return{
   placedOrder:[],
   car:0, barrel:false, bush:0, rock:false,
   fire:false, radio:0, signal:false,
-  prep:{roof:false,floor:false,door:false}, storedWood:0, wet:false, wasWet:false, metalLeft:2, grassLeft:3, blanketTaken:false, barrelFull:false, stormMsgs:{}, flash:0, notes:[],
+  prep:{roof:false,floor:false,door:false}, storedWood:0, wet:false, wasWet:false, metalLeft:2, grassLeft:3, blanketTaken:false, barrelFull:false, stormMsgs:{}, flash:0, notes:[], fog:null, seenAreas:{},
   drankClean:0, drankDirty:0, drankRiver:0, sick:false, ateCan:0, berries:0, forest:0,
   p:{x:400,y:300,face:1,step:0}, target:null, running:false, ended:false, warnedDark:false
 }}
@@ -389,7 +389,8 @@ function renderUI(){
   clockEl.textContent=fmt(S.t);
   const m=monologue();
   if(m.s!==lastSay){lastSay=m.s;sayEl.textContent='💭 '+m.s}
-  countEl.textContent=m.count||`발견한 기억 ${m.mem}/${memTotal()}`;
+  if(!S._pctT||performance.now()-S._pctT>500){S._pctT=performance.now();S._pct=explorePct()}
+  countEl.textContent=(m.count||`발견한 기억 ${m.mem}/${memTotal()}`)+` · 탐험 ${S._pct}%`;
   const I=S.inv,items=[];
   if(I.bottle)items.push(iconImg('bottle',14)+' '+({boiled:'끓인 물',rain:'빗물',filtered:'걸러낸 물',dirty:'탁한 물'}[I.bw]||'빈 병'));
   if(I.wood)items.push(iconImg('wood',14)+' 땔감 ×'+I.wood);
@@ -428,6 +429,34 @@ const dark=document.createElement('canvas');dark.width=LW;dark.height=LH;const d
 const dimg=dctx.createImageData(LW,LH);
 const BAYER=[0,8,2,10,12,4,14,6,3,11,1,9,15,7,13,5];
 const px=(c,x,y,w=1,h=1)=>{c.fillRect(x|0,y|0,w,h)};
+
+// ---------- fog of war (unexplored areas stay dark) ----------
+const FW=100,FH=60,FCELL=8; // one fog cell = 8 world px = 2 low-res px
+const fogCv=document.createElement('canvas');fogCv.width=LW;fogCv.height=LH;const fctx=fogCv.getContext('2d');const fimg=fctx.createImageData(LW,LH);
+const FOGJIT=new Array(FW*FH).fill(0).map((_,i)=>((i*2654435761)>>>0)%5-2); // ragged edges
+function newFog(){const f=new Array(FW*FH).fill(0);revealOn(f,400,262,15);return f}
+function revealOn(f,wx,wy,r){
+  const cx=wx/FCELL,cy=wy/FCELL,R=r+4;
+  for(let y=Math.max(0,cy-R|0);y<=Math.min(FH-1,cy+R|0);y++)for(let x=Math.max(0,cx-R|0);x<=Math.min(FW-1,cx+R|0);x++){
+    const i=y*FW+x,d=Math.hypot(x+.5-cx,y+.5-cy)+FOGJIT[i]*.5;
+    const v=d<r?15:Math.max(0,Math.round(15*(1-(d-r)/4)));if(v>f[i])f[i]=v;
+  }
+}
+const fogAt=(wx,wy)=>S.fog?S.fog[Math.min(FH-1,Math.max(0,wy/FCELL|0))*FW+Math.min(FW-1,Math.max(0,wx/FCELL|0))]:15;
+function explorePct(){let n=0;for(const v of S.fog)if(v>=8)n++;return Math.round(n/S.fog.length*100)}
+const AREAS=[
+  {id:'ruins',x:150,y:100,msg:'처음 와 보는 곳. 무너진 건물들… 예전엔 동네였던 곳이다.'},
+  {id:'forest',x:150,y:400,msg:'숲에 들어섰다. 나무 사이가 어둡고 조용하다.'},
+  {id:'river',x:640,y:240,msg:'강가에 닿았다. 흙빛 물이 천천히 흘러간다.'},
+  {id:'car',x:528,y:196,msg:'길가에 버려진 자동차 한 대가 보인다.'},
+  {id:'field',x:520,y:388,msg:'강가 풀밭. 키 큰 풀이 바람에 눕는다.'},
+  {id:'stop',x:575,y:90,msg:'녹슨 기둥 하나가 서 있다. 버스 정류장이었던 걸까.'},
+];
+function updateFog(){
+  if(!S.fog)S.fog=newFog();
+  revealOn(S.fog,S.p.x,S.p.y,12);
+  for(const a of AREAS){if(!S.seenAreas[a.id]&&fogAt(a.x,a.y)>=12){S.seenAreas[a.id]=1;log(a.msg);Sfx.play('discover')}}
+}
 
 function sprite(rows,pal){
   const h=rows.length,w=rows[0].length,c=document.createElement('canvas');c.width=w;c.height=h;const x=c.getContext('2d');
@@ -622,9 +651,20 @@ function draw(now){
   // lightning
   if(st>.6&&now-S.flash>2500&&Math.random()<.004){S.flash=now;Music.thunder()}
   if(now-S.flash<90||(now-S.flash>160&&now-S.flash<210)){lc.fillStyle='rgba(235,240,255,.55)';lc.fillRect(0,0,LW,LH)}
+  // fog of war
+  if(S.fog){
+    const d=fimg.data,F=S.fog;
+    for(let y=0;y<LH;y++){const row=(y>>1)*FW;for(let x=0;x<LW;x++){
+      const v=F[row+(x>>1)],i=(y*LW+x)*4;
+      if(v>=15){d[i+3]=0;continue}
+      const lv=Math.min(4,Math.floor((1-v/15)*4+BAYER[(y&3)*4+(x&3)]/16));
+      d[i]=13;d[i+1]=12;d[i+2]=18;d[i+3]=lv===4?250:lv*58;
+    }}
+    fctx.putImageData(fimg,0,0);lc.drawImage(fogCv,0,0);
+  }
   // glints of undiscovered things (above the dark, so they can be found at dusk)
   FINDS.forEach((f,i)=>{
-    if(S.found[f.id]||!visible(f))return;
+    if(S.found[f.id]||!visible(f)||fogAt(f.x,f.y)<8)return;
     const tw=Math.sin(now/380+i*1.7),x=Math.round(f.x/SC),y=Math.round(f.y/SC);
     lc.fillStyle=tw>-.3?'#fff6d8':'#b8ae90';px(lc,x,y);
     if(tw>.2){lc.fillStyle='rgba(255,246,216,.75)';px(lc,x-1,y);px(lc,x+1,y);px(lc,x,y-1);px(lc,x,y+1)}
@@ -644,7 +684,7 @@ function draw(now){
   ctx.imageSmoothingEnabled=false;ctx.drawImage(low,0,0,W,H);
   // small labels at full resolution
   ctx.font='bold 11px system-ui,sans-serif';ctx.textAlign='center';
-  [['무너진 건물',150,22],['숲',150,330],['쉼터',400,174],['강',740,18]].forEach(([t,x,y])=>{ctx.fillStyle='rgba(0,0,0,.6)';ctx.fillText(t,x+1,y+1);ctx.fillStyle='rgba(232,228,218,.7)';ctx.fillText(t,x,y)});
+  [['무너진 건물',150,22,150,100],['숲',150,330,150,400],['쉼터',400,174,400,240],['강',740,18,640,240]].forEach(([t,x,y,ax,ay])=>{if(fogAt(ax,ay)<10)return;ctx.fillStyle='rgba(0,0,0,.6)';ctx.fillText(t,x+1,y+1);ctx.fillStyle='rgba(232,228,218,.7)';ctx.fillText(t,x,y)});
 }
 
 // ---------- loop ----------
@@ -663,6 +703,7 @@ function frame(now){
       p.x+=dx/l*sp;p.y+=dy/l*sp;if(dx)p.face=dx>0?1:-1;const ps0=Math.floor(p.step);p.step+=dt/140;if(Math.floor(p.step)!==ps0&&Math.floor(p.step)%2===0)Sfx.play('step',inShelter()?'wood':stormLevel()>.2?'splash':'grass');
       p.x=Math.max(14,Math.min(645,p.x));p.y=Math.max(22,Math.min(H-14,p.y));
     }
+    updateFog();
     if(inShelter())placeCarried();
     advance(dt/1000/0.2); // 1 game-minute ≈ 0.2 s real time
     if(S.running)renderUI();
@@ -799,6 +840,7 @@ const Music=(()=>{
     rock:t=>{tone2(t,90,.25,.18,'sine',55);noise(t+.05,.25,'lowpass',500,1,.06,.03)},
     car:t=>{tone2(t,160,.45,.05,'sawtooth',95,.05);noise(t,.4,'bandpass',700,3,.03,.05);tone2(t+.45,110,.15,.12,'sine',70)},
     start:t=>{tone2(t,523,.5,.04);tone2(t+.15,784,.8,.04)},
+    discover:t=>{tone2(t,392,1.2,.035,'triangle',0,.08);tone2(t+.18,587,1.4,.035,'triangle',0,.08);tone2(t+.36,784,1.6,.025,'sine',0,.08)},
     night:t=>{[220,277,330,440].forEach((f,i)=>tone2(t+i*.12,f,2.2,.03,'triangle',0,.3))},
     fall:t=>{[392,330,262,196].forEach((f,i)=>tone2(t+i*.25,f,.9,.05,'triangle'))},
   };
@@ -817,7 +859,7 @@ const DAYS={
      intro:()=>`<h2>마지막 사람</h2><div class="sub">멸망 후 50년 · 1일차 — 물이 탁해졌다</div>
   <p>마지막으로 사람 목소리를 들은 게 언제였는지 기억나지 않는다. 도시는 숲이 되었고, 나는 강가의 작은 쉼터에서 하루하루를 지낸다.</p>
   <p>어젯밤 비가 그친 뒤로 강물이 흙빛이다. 마실 물을 구해야 한다.<br>그리고 오늘은, 조금 멀리까지 걸어 볼 생각이다.</p>
-  <p class="small">✦ 반짝이는 곳에는 50년 전의 물건이 있습니다. 가져가서 쉼터에 둘 수도, 그 자리에 둘 수도 있어요.<br>자동차, 빗물통, 덤불, 바위처럼 주변 사물에 다가가면 만져 볼 수 있어요.<br>물을 얻는 방법은 하나가 아닙니다. 위쪽 💭 혼잣말이 넌지시 알려 줍니다.<br>이동: WASD·방향키 또는 화면 탭 · 행동: Space·숫자키 또는 버튼</p>`},
+  <p class="small">✦ 반짝이는 곳에는 50년 전의 물건이 있습니다. 가져가서 쉼터에 둘 수도, 그 자리에 둘 수도 있어요.<br>자동차, 빗물통, 덤불, 바위처럼 주변 사물에 다가가면 만져 볼 수 있어요.<br>물을 얻는 방법은 하나가 아닙니다. 위쪽 💭 혼잣말이 넌지시 알려 줍니다.<br>어둡게 가려진 곳은 아직 가 보지 않은 곳입니다. 걸어가면 밝혀져요.<br>이동: WASD·방향키 또는 화면 탭 · 행동: Space·숫자키 또는 버튼</p>`},
   2:{theme:'폭풍이 온다',wake:'눈을 떴다. 바람 소리가 심상치 않다.',
      intro:()=>`<h2>2일차</h2><div class="sub">폭풍이 온다</div>
   <p>아침부터 바람 냄새가 다르다. 하늘 한쪽이 무겁게 내려앉았다.<br>오후 세 시쯤이면 폭풍이 들이닥칠 것이다.</p>
@@ -833,14 +875,14 @@ const NOTES={
 const titleEl=document.getElementById('title'),themeEl=document.getElementById('themeTxt');
 let dayStart=null;
 function startDay(n){
-  if(n===1)S=fresh();
+  if(n===1){S=fresh();S.fog=newFog()}
   else{
     S.day=n;S.t=360;S.ended=false;S.running=false;S.warnedDark=false;S.stormMsgs={};
     S.water=Math.max(15,S.water-12);S.food=Math.max(15,S.food-10);S.hp=Math.min(100,S.hp+10);S.mind=Math.max(20,S.mind);
     S.sick=false;S.fire=false;S.bush=0;S.rock=false;S.barrel=true;S.barrelFull=false;
     S.warm=80;S.wet=false;S.p={x:400,y:236,face:1,step:0};S.target=null;S.carry.forEach(id=>{S.found[id]='placed';S.placedOrder.push(id)});S.carry=[];
   }
-  dayStart=JSON.stringify(S);
+  dayStart=JSON.stringify(S,(k,v)=>k==='_pctT'?undefined:v);
   beginDay();
 }
 function retryDay(){S=JSON.parse(dayStart);beginDay()}
