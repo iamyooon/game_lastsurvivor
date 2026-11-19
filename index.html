@@ -1241,6 +1241,82 @@ DAY_HOOKS.draw.push(now=>{
   if(S.northKnown){const cx=14,cy=16;P(lc,cx-1,cy-8,'#e8a84c',2,8);P(lc,cx-1,cy,'#8a8476',2,6);P(lc,cx-5,cy,'#8a8476',10,1);
     [[0,0],[0,1],[0,2],[0,3],[1,1],[2,2],[3,0],[3,1],[3,2],[3,3]].forEach(([x,y])=>P(lc,cx+5+x,cy-12+y,'#ece4d2'))}
 });
+// ===== DAY 7 · 누군가에게 (구조 신호) =====
+addIcons({
+  mirror:[['..mmm..','.mwwbm.','mwwbbbm','mwbbbbm','mbbbbbm','.mbbbm.','..mmm..'],{m:'#6a6a66',w:'#f0f8ff',b:'#9cc4d8'}],
+  leaves:[['...g...','..ggg..','.gGgGg.','ggGgGgg','.gGgGg.','..ggg..','...t...'],{g:'#4f9a3a',G:'#3a7a2a',t:'#6a4a2c'}],
+});
+INV_EXTRA.push(['mirror','사이드미러'],['leaves','생나뭇잎']);
+addPOI({id:'sosfield',day:7,x:560,y:300,r:28,name:'강가 빈터'});
+ON_START[7]=()=>{S.barkLeft=3;S.sigPiles=0;S.sos=0};
+PRESET[7]=()=>{S.sawSunrise=true;S.shadowDone=true;S.foundPolaris=true;S.northKnown=true;S.notes=[1,2,3,4,5,6];S.found.routemap='placed';S.placedOrder.push('routemap');[[380,40],[612,36],[470,330]].forEach(([x,y])=>revealOn(S.fog,x,y,12))};
+const signalsDone=()=>[S.sigFires,S.mirrorDone,S.smokeDone,S.sos>=3].filter(Boolean).length;
+DAY_HOOKS.actions.push((o,a)=>{
+  if(!o||S.day!==7)return;const I=S.inv;
+  if(o.id==='hill'){
+    if((S.sigPiles||0)<3)a.push({label:`신호 불 자리 쌓기 (${(S.sigPiles||0)+1}/3, 장작 1)`,cost:20,ok:I.wood>=1,why:'장작이 필요하다',fn:()=>{I.wood--;S.sigPiles++;log(S.sigPiles<3?'언덕 꼭대기에 장작을 쌓았다. 셋을 삼각형으로 놓을 것이다.':'세 번째 장작더미. 언덕 위에 삼각형이 생겼다.')}});
+    else if(!S.sigFires)a.push({label:'신호 불 세 개 붙이기',cost:20,ok:I.flint&&I.steel&&((I.bark||0)>0||(I.grass||0)>0),why:!(I.flint&&I.steel)?'부싯돌과 쇳조각이 필요하다':'불쏘시개가 필요하다',fn:()=>{if(I.bark)I.bark--;else I.grass--;S.sigFires=true;Sfx.play('fire');emote('!');log('첫 더미에 불꽃을 받아 나머지 두 개로 옮겼다. 언덕 위에 불 세 개. 누군가 보기를.')}});
+    if(I.mirror&&!S.mirrorDone)a.push({label:'거울로 햇빛 반사하기',cost:20,ok:S.t>=8*60&&S.t<17*60&&stormLevel()===0,why:'해가 있어야 한다',fn:()=>{S.mirrorDone=true;S.flashAt=performance.now();emote('!');log('한 손을 V자로 내밀어 북쪽 먼 산을 겨누고, 그 사이로 거울 빛을 보냈다. 반짝, 반짝, 반짝.')}});
+  }
+  if(o.id==='car'&&!I.mirror&&!S.mirrorDone)a.push({label:'사이드미러 떼어 내기',cost:15,ok:true,fn:()=>{I.mirror=1;log('녹슨 나사를 돌로 두드려 사이드미러를 떼어 냈다. 금은 갔지만 햇빛은 잘 받는다. (사이드미러)')}});
+  if(o.id==='forest')a.push({label:'생가지 꺾기',cost:15,ok:!I.leaves,why:'이미 한 아름 있다',fn:()=>{I.leaves=1;log('잎이 무성한 생가지를 한 아름 꺾었다. 태우면 흰 연기가 날 것이다. (생나뭇잎)')}});
+  if(o.id==='fire'&&S.fire&&I.leaves&&!S.smokeDone)a.unshift({label:'생나뭇잎 올려 흰 연기 내기',cost:20,ok:S.t<18*60,why:'어두우면 연기가 안 보인다',fn:()=>{I.leaves=0;S.smokeDone=true;S.smokeAt=S.t;emote('!');log('불 위에 생잎을 덮자 하얀 연기가 굵게 솟아올랐다. 탁 트인 하늘로 곧게.')}});
+  if(o.id==='sosfield'&&(S.sos||0)<3)a.push({label:`돌 날라 ${'SOS'[S.sos||0]} 만들기`,cost:30,ok:true,fn:()=>{S.sos=(S.sos||0)+1;log(S.sos<3?`강가 돌을 날라 빈터에 커다랗게 ${'SOS'[S.sos-1]} 자를 놓았다.`:'마지막 S. 빈터에 큰 글자가 생겼다. 하늘에서 보면 읽힐 것이다. S O S.')}});
+  if(o.id==='radio'&&S.t>=19*60&&!S.answered){a.length=0;a.push({label:'라디오 켜기',cost:20,ok:true,fn:()=>setTimeout(radioAnswer,30)})}
+});
+function radioAnswer(){
+  if(signalsDone()<2){S.radio++;emote('…');log('지지직… 잡음뿐이다. 아무도 못 본 걸까. 신호를 더 보내야 할지도.');return}
+  S.answered=true;S.running=false;emote('note',4000);Music.musicBox();
+  card.innerHTML=`<div class="icon"><img src="${AICONURL.radio}" width="60" height="60" style="image-rendering:pixelated" alt=""></div><h2>라디오</h2><div class="sub">7일차 · ${fmt(S.t)}</div>
+  <div class="paper">치지직… 다이얼을 돌리자 잡음이 걷히고, 또렷한 목소리가 흘러나왔다.
+
+「…여기는 북부 대피소. 강가 쪽 신호 확인했다. 반복한다, 신호 확인했다.」
+
+잠시 침묵. 그리고 조심스러운 목소리.
+
+「…강가 오두막, 맞습니까? 혹시… 이수아 씨입니까? 대피소 기록에… 아버님이 매일 이 주파수로 그 이름을 부르셨다고…」
+
+손이 떨려 다이얼을 놓칠 뻔했다.
+
+「…산길은 무너졌다. 강 하구 선착장으로 와라. 배를 보내겠다…」</div>
+  <div class="btns" style="justify-content:center"><button id="c1">"…네. 제가 수아예요."</button></div>`;
+  ov.classList.remove('hide');
+  document.getElementById('c1').onclick=()=>{ov.classList.add('hide');S.running=true;dirtyUI=true;emote('♥',3000);log('대답은 닿았을까. 오늘 밤은 잠이 오지 않을 것 같다.')};
+}
+MONO[7]=()=>{
+  const I=S.inv;let s;const n=signalsDone();
+  if(S.answered)s='누군가 들었다. 강 하구 선착장. 오늘은 쉬자. 내일은…';
+  else if(n>=2&&S.t>=19*60)s='신호는 보냈다. 이제 라디오를 켜 보자.';
+  else if(n>=2)s='신호를 보냈다. 밤이 되면 라디오를 켜 보자. 신호를 더 보내도 좋다.';
+  else{
+    const todo=[];
+    if(!S.sigFires)todo.push((S.sigPiles||0)<3?'북쪽 언덕에 장작 세 더미':'언덕 위 장작에 불을');
+    if(!S.mirrorDone)todo.push(I.mirror?'언덕에서 거울 반사':'자동차 사이드미러');
+    if(!S.smokeDone)todo.push(I.leaves?'모닥불에 생나뭇잎':'숲에서 생가지');
+    if((S.sos||0)<3)todo.push('강가 빈터에 SOS');
+    s=`누군가에게 여기 있다고 알려야 한다. ${todo.slice(0,3).join(', ')}… 둘 이상은 해 두자.`;
+  }
+  if(S.carry.length&&S.t<18*60)s+=' 배낭 속 물건은 쉼터에 가져다 두자.';
+  return {s,count:`신호 — 불 세 개 ${ck(S.sigFires)} · 거울 ${ck(S.mirrorDone)} · 흰 연기 ${ck(S.smokeDone)} · SOS ${ck((S.sos||0)>=3)}`};
+};
+DAY_HOOKS.draw.push(now=>{
+  if(S.day!==7)return;
+  // signal piles on the hill, in a triangle
+  const piles=[[180,25],[200,25],[190,13]];
+  piles.slice(0,S.sigPiles||0).forEach(([x,y],i)=>{
+    P(lc,x-3,y,'#5a3e26',7,2);P(lc,x-2,y-1,'#7a5a3a',5,1);P(lc,x-1,y-2,'#5a3e26',3,1);
+    if(S.sigFires){seed=(now/110|0)*5+i*17;for(let k=0;k<5;k++){const hh=2+(rnd()*5|0)-Math.abs(k-2);for(let j=0;j<hh;j++)P(lc,x-2+k,y-2-j,j<1?'#c8361e':j<hh-1?'#f08a2a':'#f8d050')}}
+  });
+  if(S.sigFires&&S.t>=18*60){for(const [x,y] of piles){const g=lc.createRadialGradient(x,y-2,0,x,y-2,14);g.addColorStop(0,'rgba(255,170,70,.25)');g.addColorStop(1,'rgba(255,140,40,0)');lc.fillStyle=g;lc.fillRect(x-14,y-16,28,28)}}
+  // white smoke column
+  if(S.smokeDone&&S.fire&&S.t-S.smokeAt<240){for(let i=0;i<14;i++){const t=((now/45+i*9)%90)/90;const w=2+t*6;P(lc,198+Math.sin(t*5+i)*4*t-w/2,165-t*70,`rgba(235,235,232,${.55*(1-t)})`,w,3)}}
+  // SOS in stones
+  const letters=[[[0,0],[1,0],[2,0],[0,1],[0,2],[1,2],[2,2],[2,3],[2,4],[1,4],[0,4]],[[0,0],[1,0],[2,0],[0,1],[2,1],[0,2],[2,2],[0,3],[2,3],[0,4],[1,4],[2,4]],null];
+  letters[2]=letters[0];
+  for(let li=0;li<(S.sos||0);li++)letters[li].forEach(([x,y])=>{P(lc,268+li*9+x*2,140+y*2,'#b8b4aa',2,2);P(lc,268+li*9+x*2,140+y*2,'#d8d4ca')});
+  // mirror flashes
+  if(S.flashAt&&performance.now()-S.flashAt<2400&&Math.floor(now/200)%2===0){const x=L(S.p.x)+5,y=L(S.p.y)-14;P(lc,x,y,'#ffffff');P(lc,x-2,y,'#fff8d0');P(lc,x+2,y,'#fff8d0');P(lc,x,y-2,'#fff8d0');P(lc,x,y+2,'#fff8d0')}
+});
 // @@DAY_WORLD@@
 // ---------- loop ----------
 let last=performance.now();
@@ -1597,6 +1673,46 @@ JOURNAL[6]=(forced,home)=>{
   if(S.found.routemap)L.push('노선도 조각의 동그라미. 「배 — 강 하구 선착장」. 산이 막혔다면, 강으로.');
   return L;
 };
+DAYS[7]={theme:'누군가에게',wake:'눈을 떴다. 오늘은 할 일이 분명하다.',
+  intro:()=>`<h2>7일차</h2><div class="sub">누군가에게</div>
+  <p>북쪽을 안다. 대피소가 있다는 것도 안다. 하지만 산길은 무너졌고, 혼자서는 갈 수 없다.</p>
+  <p>오늘은 <b>멀리 있는 누군가에게 여기 있다고 알리는 법</b>을 익혀야 한다. 지금까지 배운 모든 것이 필요하다.</p>
+  <p class="small">낮에 잘 보이는 신호와 밤에 잘 보이는 신호가 다릅니다. 두 가지 이상 보내 두세요.<br>그리고 밤이 오면, 라디오를 켜 보세요.</p>`};
+NOTES[7]={title:'구조 신호',body:['셋은 국제 조난 신호다: 불 세 개(삼각형), 호루라기 세 번, 연기 세 줄.','낮에는 연기와 거울 반사, 밤에는 불빛이 멀리서 잘 보인다.','흰 연기는 생나무나 젖은 잎을 올려 낸다. 넓고 트인 곳에서.','거울은 한 손을 V자로 내밀어 목표를 겨누고 그 사이로 빛을 보낸다.','땅에 아주 크게 SOS를 만들면 하늘에서 보인다. 주변과 색이 다른 재료로.'],
+  did:()=>[S.sigFires?'신호 불 세 개':null,S.mirrorDone?'거울 반사':null,S.smokeDone?'흰 연기':null,(S.sos||0)>=3?'SOS 돌 글자':null].filter(Boolean).join(' · ')||'아직 못 해 봄'};
+JOURNAL[7]=(forced,home)=>{
+  const L=['7일차.'];
+  const done=[S.sigFires&&'언덕 위 불 세 개',S.smokeDone&&'흰 연기',S.mirrorDone&&'거울 빛',(S.sos||0)>=3&&'강가의 SOS'].filter(Boolean);
+  L.push(done.length?`${done.join(', ')}. 내가 아는 모든 방법으로 여기 있다고 외쳤다.`:'신호를 보내지 못했다. 아직 용기가 나지 않았던 걸까.');
+  if(S.answered){
+    L.push('그리고 밤, 라디오가 대답했다.');
+    L.push('「혹시 이수아 씨입니까?」');
+    L.push('운동화, 우산, 크레용 그림, 편지. 내 이름이 적혀 있던 물건들. 나는 50년 동안 내 이름을 잊고 살았다.');
+    L.push('아빠는 매일 그 이름을 불렀다고 한다.');
+  }else L.push('라디오는 잡음뿐이었다. 내일 다시 해 보자.');
+  return L;
+};
+function showEnding(){
+  const skills=['식수 만들기','쉼터와 체온','불 피우기','먹을 것 구하기','응급처치','방향 찾기','구조 신호'];
+  const mem=FINDS.filter(f=>f.kind==='mem'&&S.found[f.id]).length,total=FINDS.filter(f=>f.kind==='mem').length;
+  Music.musicBox();
+  card.innerHTML=`<h2>마지막 사람 · 1부 끝</h2><div class="sub">멸망 후 50년, 일곱 날</div>
+  <div class="paper">${S.answered?
+  `강 하구 선착장으로 가는 길은 아직 모른다. 내일은 무너진 산 아래를 지나야 할지도 모르고, 떠밀려 온 배를 고쳐야 할지도 모른다.
+
+하지만 이제 나는 안다. 물을 만들 줄 알고, 불을 피울 줄 알고, 북쪽이 어디인지 안다.
+
+그리고 내 이름이 수아라는 것을.`:
+  `일곱 날을 혼자 버텼다. 물을 만들고, 불을 피우고, 북쪽을 찾았다.
+
+라디오는 아직 대답하지 않았다. 하지만 신호는 내일도 보낼 수 있다.`}</div>
+  <div class="note"><div class="nh">📖 생존 수첩 — 일주일 동안 익힌 것</div><ul>${skills.map((k,i)=>`<li>${i+1}일차 · ${k} ${S.notes.includes(i+1)?'✓':''}</li>`).join('')}</ul><div class="did">찾은 기억 ${mem}/${total} · 탐험 ${explorePct()}%</div></div>
+  <p class="small">다음 이야기 — 무너진 산의 동굴, 강 하구의 배 (준비 중)</p>
+  <div class="btns">${S.answered?'':'<button id="again">7일차 다시 하기</button>'}<button id="restart" class="ghost">처음부터</button><button id="pick" class="ghost">날짜 선택</button></div>`;
+  ov.classList.remove('hide');
+  const $=id=>document.getElementById(id);
+  if($('again'))$('again').onclick=retryDay;$('restart').onclick=()=>startDay(1);$('pick').onclick=()=>showTitle(false);
+}
 // @@DAY_SCREENS@@
 const WEEK=[
   {d:1,theme:'물이 탁해졌다',skill:'식수 만들기',ready:true},
@@ -1605,7 +1721,7 @@ const WEEK=[
   {d:4,theme:'배가 고프다',skill:'먹을 것 구하기',ready:true},
   {d:5,theme:'다쳤다',skill:'응급처치',ready:true},
   {d:6,theme:'북쪽은 어디일까',skill:'방향 찾기',ready:true},
-  {d:7,theme:'누군가에게',skill:'구조 신호 보내기'},
+  {d:7,theme:'누군가에게',skill:'구조 신호 보내기',ready:true},
 ];
 // a reasonable "yesterday" for starting a later day directly
 function presetFor(n){
