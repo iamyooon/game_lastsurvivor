@@ -691,6 +691,29 @@ function makeCar(open){const [c,x]=mk(46,30);x.translate(23,15);x.rotate(-.18);x
   return c}
 const CAR=makeCar(false),CAR_OPEN=makeCar(true);
 
+
+// --- rain: two depth layers, random placement, streaks aligned with the fall direction, splashes on the ground ---
+const WIND=.28; // horizontal drift per pixel of fall (drops fall down and slightly left)
+const RAIN=(()=>{seed=1234;const a=[];for(let i=0;i<520;i++){const near=rnd()<.35;a.push({x0:rnd()*(LW+80),y0:rnd()*(LH+30),spd:near?.30+rnd()*.06:.17+rnd()*.05,len:near?6+(rnd()*2|0):3+(rnd()*2|0),near})}return a})();
+const hash=n=>{n=(n^61)^(n>>>16);n=(n+(n<<3))|0;n=n^(n>>>4);n=Math.imul(n,0x27d4eb2d);n=n^(n>>>15);return (n>>>0)/4294967296};
+function drawRain(now,st){
+  const n=(RAIN.length*Math.min(1,st))|0,roof=S.prep.roof;
+  for(let i=0;i<n;i++){const r=RAIN[i],fall=now*r.spd;
+    const y=((r.y0+fall)%(LH+30))-15,x=(((r.x0-fall*WIND)%(LW+80))+(LW+80))%(LW+80)-40;
+    if(roof&&x>SH.x0&&x<SH.x0+SH.w&&y>SH.y0&&y<SH.y0+SH.h)continue;
+    lc.fillStyle=r.near?'rgba(200,218,238,.62)':'rgba(150,172,200,.38)';
+    for(let k=0;k<r.len;k++)px(lc,x+k*WIND,y-k);
+  }
+  // splashes: short-lived ticks scattered over the ground
+  const splashN=(46*st)|0;
+  for(let i=0;i<splashN;i++){const period=420+(i%7)*40,cyc=Math.floor((now+i*137)/period),ph=((now+i*137)%period)/period;
+    if(ph>.32)continue;
+    const sx=hash(cyc*97+i*13)*LW|0,sy=hash(cyc*31+i*7+5)*LH|0;
+    if(roof&&sx>SH.x0&&sx<SH.x0+SH.w&&sy>SH.y0&&sy<SH.y0+SH.h)continue;
+    const water=sx>330;lc.fillStyle=water?'rgba(190,175,140,.55)':'rgba(200,220,240,.6)';
+    if(ph<.14){px(lc,sx,sy)}else if(water){px(lc,sx-2,sy);px(lc,sx+2,sy);px(lc,sx,sy-1);px(lc,sx,sy+1)}else{px(lc,sx-1,sy-1);px(lc,sx+1,sy-1);px(lc,sx-2,sy);px(lc,sx+2,sy)}
+  }
+}
 const SHELF=[[194,96],[202,96],[193,113],[201,113],[185,121],[212,124],[220,124],[201,121]];
 const drawAt=(img,wx,wy)=>lc.drawImage(img,Math.round(L(wx)-img.width/2),Math.round(L(wy)-img.height));
 
@@ -747,8 +770,7 @@ function draw(now){
   if(cl>0){lc.fillStyle=`rgba(40,46,60,${cl*.28})`;lc.fillRect(0,0,LW,LH)}
   if(st>0){
     if(!S.prep.roof){for(let i=0;i<5;i++){const dy=((now/45+i*9)%34)|0;P(lc,192+i*6,95+dy,'#7fb2d4',1,2)}}
-    lc.fillStyle='rgba(170,195,220,.5)';const n=(420*st)|0;
-    for(let i=0;i<n;i++){const x=((i*37+now/2.2)%(LW+40))-20|0,y=((i*53+now/1.1)%(LH+12))-6|0;px(lc,x,y);px(lc,x-1,y+1);px(lc,x-2,y+2);px(lc,x-3,y+3)}
+    drawRain(now,st);
   }
   // target marker
   if(S.target){lc.fillStyle='rgba(255,255,255,.65)';const tx=Math.round(L(S.target.x)),ty=Math.round(L(S.target.y));[[-2,-2],[-1,-1],[1,1],[2,2],[-2,2],[-1,1],[1,-1],[2,-2]].forEach(([a,b])=>px(lc,tx+a,ty+b))}
