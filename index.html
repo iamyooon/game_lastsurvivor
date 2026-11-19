@@ -47,7 +47,22 @@
   #inv .lbl{color:var(--dim);font-size:11px;margin-right:6px}
   #inv span.item{display:inline-flex;align-items:center;gap:3px;background:#0e0d10;border:1px solid var(--line);padding:1px 5px;margin:1px 3px 1px 0;white-space:nowrap}
   #actions{display:none}
-  #ring{position:absolute;left:0;top:0;width:0;height:0;z-index:6;pointer-events:none}
+  #ring{position:absolute;left:0;top:0;z-index:6;pointer-events:auto;display:none;min-width:150px;max-width:240px;background:rgba(14,13,17,.93);border:2px solid #000;box-shadow:inset 0 0 0 1px var(--line),3px 3px 0 rgba(0,0,0,.5);padding:3px}
+  #ring.on{display:block;animation:rbIn .15s steps(3)}
+  .cmh{font-size:11px;color:var(--accent);padding:2px 6px 3px;white-space:nowrap}
+  .cm{display:flex;align-items:center;gap:7px;width:100%;text-align:left;background:transparent;box-shadow:none;border:0;border-top:1px solid #2a2630;padding:5px 6px;font-size:12.5px;line-height:1.3}
+  .cm:hover:not(:disabled){background:#3a2f22}
+  .cm img{width:20px;height:20px;image-rendering:pixelated;flex:0 0 auto}.cm img.s7{width:21px;height:21px}
+  .cm .lb{flex:1}.cm .t{color:var(--dim);font-size:10.5px;white-space:nowrap}
+  .cm .why{display:block;color:#d88a6a;font-size:10.5px}
+  .cm .n{font-family:"Press Start 2P",monospace;font-size:7px;color:var(--accent);flex:0 0 auto}
+  .cm:disabled{opacity:.6}
+  #bagPop{position:absolute;z-index:8;display:none;min-width:170px;background:rgba(14,13,17,.95);border:2px solid #000;box-shadow:inset 0 0 0 1px var(--line),3px 3px 0 rgba(0,0,0,.5);padding:3px}
+  #bagPop.on{display:block;animation:rbIn .15s steps(3)}
+  #bagPop .none{font-size:12px;color:var(--dim);padding:5px 6px}
+  #inv span.item{cursor:pointer}
+  #inv span.item.use{border-color:#8a6a3a;box-shadow:inset 0 0 0 1px #5a4428}
+  #inv span.item.use:after{content:"●";color:var(--accent);font-size:7px;margin-left:3px}
   .rb{position:absolute;width:34px;height:34px;margin:-17px 0 0 -17px;padding:0;display:flex;align-items:center;justify-content:center;pointer-events:auto;animation:rbIn .2s steps(3)}
   .rb img{width:20px;height:20px;image-rendering:pixelated;pointer-events:none}
   .rb img.s7{width:21px;height:21px}
@@ -121,6 +136,7 @@
   body[data-mode=phoneL] #inv{flex-wrap:nowrap;overflow-x:auto;min-height:0}
   /* touch screens: finger-sized buttons */
   @media (pointer:coarse){
+    .cm{padding:9px 8px;font-size:14px}.cm img{width:24px;height:24px}
     .rb{width:46px;height:46px;margin:-23px 0 0 -23px}
     .rb img{width:26px;height:26px}.rb img.s7{width:28px;height:28px}
     .rb .n{display:none}
@@ -153,6 +169,7 @@
       </div>
       <div id="stats2"></div>
     </div>
+    <div id="bagPop"></div>
     <div id="ov"><div class="card" id="ovCard"></div></div>
   </div>
 </div>
@@ -328,7 +345,7 @@ function drinkActions(){
     filtered:{label:'걸러낸 물 마시기',w:30,hp:-3,msg:'흙맛이 조금 남았지만 마실 만하다. (물 +30, 체력 -3)'},
     dirty:{label:'탁한 물 마시기',w:30,hp:-10,sick:true,msg:'참지 못하고 들이켰다. 곧 배가 아파 온다. (물 +30, 체력 -10)'},
   }[I.bw];
-  a.push({label:D.label,cost:5,ok:true,fn:()=>{S.water=Math.min(100,S.water+D.w);S.hp+=D.hp;if(D.sick){S.sick=true;S.drankDirty++;emote('sweat')}else{S.drankClean++;emote('♥')}S.lastDrink=I.bw;I.bw=null;log(D.msg)}});
+  a.push({bag:'bottle',label:D.label,cost:5,ok:true,fn:()=>{S.water=Math.min(100,S.water+D.w);S.hp+=D.hp;if(D.sick){S.sick=true;S.drankDirty++;emote('sweat')}else{S.drankClean++;emote('♥')}S.lastDrink=I.bw;I.bw=null;log(D.msg)}});
   return a;
 }
 function useRadio(){
@@ -462,7 +479,7 @@ function monologue(){
   else if(!S.drankClean&&I.bw==='dirty'&&!S.fire&&I.wood<2)s='흙탕물이다. 끓이려면 숲에서 마른 가지를 주워 와야 한다.';
   else if(!S.drankClean&&I.bw==='dirty'&&!S.fire)s=I.lighter?'땔감은 됐다. 모닥불 자리에서 라이터로 불을 붙이자.':'땔감은 됐다. 불씨가 없으니 비벼야 하나… 길가 차 안에 뭔가 있을지도.';
   else if(!S.drankClean&&I.bw==='dirty')s='불이 있다. 끓이면 마실 수 있을 것이다.';
-  else if(!S.drankClean&&I.bw)s='물이 있다. 목부터 축이자.';
+  else if(!S.drankClean&&I.bw)s='물이 있다. 배낭의 병을 눌러 목부터 축이자.';
   else if(!S.fire&&S.t>=15*60)s='밤이 오기 전에 불을 피워 두고 싶다.';
   else if(mem<memTotal())s=mem===0?'목은 축였다. 해가 지기 전까지 천천히 걸어 보자. 여기저기 반짝이는 게 있다.':'이 근처에 누가 살았던 걸까. 조금 더 걸어 보자.';
   else s='오늘은 많이 걸었다. 쉼터로 돌아가 쉬자.';
@@ -495,33 +512,39 @@ statsEl.innerHTML=statHTML('');document.getElementById('stats2').innerHTML=statH
 let currentActions=[],lastActKey='',dirtyUI=true,lastSay='';
 function log(m){const p=document.createElement('p');p.textContent=m;logEl.prepend(p);while(logEl.children.length>6)logEl.lastChild.remove()}
 function fmt(t){const h=Math.floor(t/60)%24,m=Math.floor(t%60);return String(h).padStart(2,'0')+':'+String(m).padStart(2,'0')}
-const ringEl=document.getElementById('ring'),capEl=document.getElementById('cap');
-let ringSel=0,ringPlace='';
-function capText(i){const a=currentActions[i];if(!a)return '';
-  return `<span class="pl">${ringPlace}</span>${a.label}${a.cost?`<span class="t">${a.cost}분</span>`:''}${!a.ok&&a.why?`<span class="why">${a.why}</span>`:''}`}
+const ringEl=document.getElementById('ring'),capEl=document.getElementById('cap'),bagEl=document.getElementById('bagPop');
+let ringPlace='',bagActs=[],bagOpen=null;
+const actRow=(a,i)=>`<button class="cm" data-i="${i}" ${a.ok?'':'disabled'}>${actIcon(a.label)}<span class="lb">${a.label.replace(/\s*\(.*\)$/,'')}${!a.ok&&a.why?`<span class="why">${a.why}</span>`:''}</span>${a.cost?`<span class="t">${a.cost}분</span>`:''}${i<4&&!matchMedia('(pointer:coarse)').matches?`<span class="n">${i+1}</span>`:''}</button>`;
 function buildRing(o){
-  ringEl.innerHTML='';ringPlace=o?o.name:'';
-  ringSel=Math.max(0,currentActions.findIndex(a=>a.ok));
-  currentActions.forEach((a,i)=>{
-    const b=document.createElement('button');b.className='rb'+(a.ok?'':' no')+(i===ringSel?' sel':'');
-    b.innerHTML=actIcon(a.label)+(i<4?`<span class="n">${i+1}</span>`:'');b.title=a.label;
-    b.onmouseenter=()=>{ringSel=i;[...ringEl.children].forEach((c,j)=>c.classList.toggle('sel',j===i));capEl.innerHTML=capText(i)};
-    b.onclick=e=>{e.stopPropagation();if(a.ok){Sfx.play('pick');doAction(a)}else{capEl.innerHTML=capText(i)}};
-    ringEl.appendChild(b);
-  });
-  capEl.innerHTML=currentActions.length?capText(ringSel):'';
-  placeRing(true);
+  ringPlace=o?o.name:'';capEl.innerHTML='';
+  if(!currentActions.length){ringEl.classList.remove('on');ringEl.innerHTML='';return}
+  ringEl.innerHTML=`<div class="cmh">▸ ${ringPlace}</div>`+currentActions.map(actRow).join('');
+  ringEl.querySelectorAll('.cm').forEach(b=>b.onclick=e=>{e.stopPropagation();const a=currentActions[+b.dataset.i];if(a&&a.ok){Sfx.play('pick');doAction(a)}});
+  ringEl.classList.add('on');placeRing(true);
 }
-function placeRing(force){
-  const n=ringEl.children.length;if(!n){capEl.innerHTML='';return}
-  const sx=cv.clientWidth/CAM.vw,sy=cv.clientHeight/CAM.vh,hx=(S.p.x-CAM.dx)*sx,hy=cv.offsetTop+(S.p.y-4-CAM.dy)*sy;
-  const bs=ringEl.children[0].offsetWidth||34,R=Math.max(bs*1.45,cv.clientWidth*.066),up=((S.p.y-CAM.dy)*sy)>R+44;
-  const step=2*Math.asin(Math.min(1,(bs+6)/(2*R)))*180/Math.PI,center=up?-90:90,spread=Math.min(210,step*(n-1));
-  ringEl.style.left=hx+'px';ringEl.style.top=hy+'px';
-  if(force||ringEl.dataset.up!==String(up)){ringEl.dataset.up=up;
-    [...ringEl.children].forEach((b,i)=>{const ang=(center-spread/2+(n>1?spread*i/(n-1):0))*Math.PI/180;b.style.left=Math.cos(ang)*R+'px';b.style.top=Math.sin(ang)*R+'px'})}
-  capEl.style.left=Math.max(90,Math.min(cv.clientWidth-90,hx))+'px';capEl.style.top=(up?hy-R-24:hy+R+48)+'px';capEl.style.transform=up?'translate(-50%,-100%)':'translate(-50%,0)';
+function placeRing(){
+  if(!ringEl.classList.contains('on'))return;
+  const sx=cv.clientWidth/CAM.vw,sy=cv.clientHeight/CAM.vh,hx=(S.p.x-CAM.dx)*sx,hy=cv.offsetTop+(S.p.y-6-CAM.dy)*sy;
+  const w=ringEl.offsetWidth,h=ringEl.offsetHeight,gap=18*sx/2+8;
+  let left=hx+gap;if(left+w>cv.clientWidth-4)left=hx-gap-w;left=Math.max(4,left);
+  let top=hy-h/2;top=Math.max(cv.offsetTop+4,Math.min(cv.offsetTop+cv.clientHeight-h-4,top));
+  ringEl.style.left=left+'px';ringEl.style.top=top+'px';
 }
+// --- bag: tap an item in the backpack to use it ---
+function openBag(key,chip){
+  if(bagOpen===key){closeBag();return}
+  bagOpen=key;const acts=bagActs.filter(a=>a.bag===key);
+  const name=chip.textContent.trim();
+  bagEl.innerHTML=`<div class="cmh">🎒 ${name}</div>`+(acts.length?acts.map((a,i)=>actRow(a,i).replace(/<span class="n">.*?<\/span>/,'')).join(''):`<div class="none">지금은 쓸 일이 없다.</div>`);
+  bagEl.querySelectorAll('.cm').forEach(b=>b.onclick=e=>{e.stopPropagation();const a=acts[+b.dataset.i];if(a&&a.ok&&S.running){doAction(a);closeBag()}});
+  const g=document.getElementById('game').getBoundingClientRect(),r=chip.getBoundingClientRect();
+  bagEl.classList.add('on');
+  bagEl.style.left=Math.max(4,Math.min(g.width-bagEl.offsetWidth-4,r.left-g.left))+'px';
+  bagEl.style.top=Math.max(4,r.top-g.top-bagEl.offsetHeight-6)+'px';
+}
+function closeBag(){bagOpen=null;bagEl.classList.remove('on');bagEl.innerHTML=''}
+addEventListener('pointerdown',e=>{if(bagOpen&&!bagEl.contains(e.target)&&!(e.target.closest&&e.target.closest('#inv .item')))closeBag()});
+let lastInvKey='';
 function renderUI(){
   for(const [k] of STATS){const v=Math.max(0,S[k]);for(const x of ['','2']){document.getElementById('v_'+k+x).textContent=Math.round(v);document.getElementById('b_'+k+x).style.width=v+'%'}}
   clockEl.textContent=fmt(S.t);
@@ -529,23 +552,32 @@ function renderUI(){
   if(m.s!==lastSay){lastSay=m.s;sayEl.textContent=m.s}
   if(!S._pctT||performance.now()-S._pctT>500){S._pctT=performance.now();S._pct=explorePct()}
   countEl.textContent=(m.count||`발견한 기억 ${m.mem}/${memTotal()}`)+` · 탐험 ${S._pct}%`;
-  const I=S.inv,items=[];
-  if(I.bottle)items.push(iconImg('bottle',14)+' '+({boiled:'끓인 물',rain:'빗물',filtered:'걸러낸 물',dirty:'탁한 물'}[I.bw]||'빈 병'));
-  if(I.wood)items.push(iconImg('wood',14)+' 땔감 ×'+I.wood);
-  if(I.cloth)items.push(iconImg('cloth',14)+' 헝겊');
-  if(I.lighter)items.push(iconImg('lighter',14)+' 라이터');
-  if(I.cray)items.push(iconImg('cray',14)+' 가재 ×'+I.cray);
-  if(I.can)items.push(iconImg('can',14)+' 통조림 ×'+I.can);
-  for(const id of S.carry){const f=FINDS.find(x=>x.id===id);items.push(iconImg(id,14)+' '+f.name)}
-  if(I.metal)items.push(iconImg('metal',14)+' 함석판 ×'+I.metal);
-  if(I.grass)items.push(iconImg('grass',14)+' 마른 풀 ×'+I.grass);
-  if(I.blanket)items.push(iconImg('blanket',14)+' 담요');
-  INV_EXTRA.forEach(([k,lab])=>{const v=I[k];if(v)items.push(iconImg(k,14)+' '+lab+(v>1?' ×'+v:''))});
-  if(S.sick)items.push('⚠ 배탈');
-  if(S.wet)items.push('💧 젖음');
-  invEl.innerHTML=items.length?items.map(t=>`<span class="item">${t}</span>`).join(''):'<span style="color:var(--dim)">비어 있음</span>';
-  const o=nearPOI();currentActions=actionsFor(o).concat(S._walk?[]:drinkActions().concat(globalDayActions()));
-  if(I.can&&!S._walk)currentActions.push({label:'통조림 먹기',cost:10,ok:true,fn:()=>{emote('♥');S.inv.can--;S.ateCan++;S.food=Math.min(100,S.food+30);log('칼로 통조림을 땄다. 정체 모를 콩 요리. 맛은 상관없다. (식량 +30)')}});
+  const I=S.inv,items=[];const add=(k,html)=>items.push([k,html]);
+  if(I.bottle)add('bottle',iconImg('bottle',14)+' '+({boiled:'끓인 물',rain:'빗물',filtered:'걸러낸 물',dirty:'탁한 물'}[I.bw]||'빈 병'));
+  if(I.wood)add('wood',iconImg('wood',14)+' 땔감 ×'+I.wood);
+  if(I.cloth)add('cloth',iconImg('cloth',14)+' 헝겊');
+  if(I.lighter)add('lighter',iconImg('lighter',14)+' 라이터');
+  if(I.cray)add('cray',iconImg('cray',14)+' 가재 ×'+I.cray);
+  if(I.can)add('can',iconImg('can',14)+' 통조림 ×'+I.can);
+  for(const id of S.carry){const f=FINDS.find(x=>x.id===id);add('mem_'+id,iconImg(id,14)+' '+f.name)}
+  if(I.metal)add('metal',iconImg('metal',14)+' 함석판 ×'+I.metal);
+  if(I.grass)add('grass',iconImg('grass',14)+' 마른 풀 ×'+I.grass);
+  if(I.blanket)add('blanket',iconImg('blanket',14)+' 담요');
+  INV_EXTRA.forEach(([k,lab])=>{const v=I[k];if(v)add(k,iconImg(k,14)+' '+lab+(v>1?' ×'+v:''))});
+  if(S.sick)add('',' ⚠ 배탈');
+  if(S.wet)add('',' 💧 젖음');
+  // item-use actions live in the bag, not around the hero
+  bagActs=drinkActions().concat(globalDayActions().filter(x=>x.bag));
+  if(I.can)bagActs.push({bag:'can',label:'통조림 먹기',cost:10,ok:true,fn:()=>{emote('♥');S.inv.can--;S.ateCan++;S.food=Math.min(100,S.food+30);log('칼로 통조림을 땄다. 정체 모를 콩 요리. 맛은 상관없다. (식량 +30)')}});
+  const usable=new Set(bagActs.filter(x=>x.ok).map(x=>x.bag));
+  const invKey=items.map(([k,h])=>k+h+(usable.has(k)?'*':'')).join('|');
+  if(invKey!==lastInvKey){lastInvKey=invKey;
+    invEl.innerHTML=items.length?items.map(([k,h])=>`<span class="item${usable.has(k)?' use':''}" data-k="${k}">${h}</span>`).join(''):'<span style="color:var(--dim)">비어 있음</span>';
+    invEl.querySelectorAll('.item').forEach(el=>el.onclick=e=>{e.stopPropagation();if(el.dataset.k)openBag(el.dataset.k,el)});
+    if(bagOpen){const ch=invEl.querySelector(`.item[data-k="${bagOpen}"]`);const k=bagOpen;bagOpen=null;if(ch)openBag(k,ch);else closeBag()}
+  }
+  // the menu beside the hero: only what this spot offers (plus things like the night sky)
+  const o=nearPOI();currentActions=actionsFor(o).concat(S._walk?[]:globalDayActions().filter(x=>!x.bag));
   const key=(o?(o.id+(o.find?o.find.id:'')):'')+'|'+currentActions.map(a=>a.label+a.ok).join(',')+'|'+I.can;
   if(key!==lastActKey||dirtyUI){
     lastActKey=key;dirtyUI=false;
@@ -1173,11 +1205,11 @@ function fishOnce(){
 }
 DAY_HOOKS.global.push(a=>{
   if(!S||S.day<4)return;const I=S.inv;
-  if(I.dfish)a.push({label:'말린 생선 먹기',cost:10,ok:true,fn:()=>{I.dfish--;S.food=clamp100(S.food+20);emote('♥');log('딱딱하지만 씹을수록 고소하다. (식량 +20)')}});
-  if(I.dand&&!(S.fire&&I.bw))a.push({label:'민들레 날로 먹기',cost:5,ok:true,fn:()=>{I.dand--;S.food=clamp100(S.food+8);log('쓰다. 그래도 먹을 수 있는 풀이다. (식량 +8)')}});
+  if(I.dfish)a.push({bag:'dfish',label:'말린 생선 먹기',cost:10,ok:true,fn:()=>{I.dfish--;S.food=clamp100(S.food+20);emote('♥');log('딱딱하지만 씹을수록 고소하다. (식량 +20)')}});
+  if(I.dand&&!(S.fire&&I.bw))a.push({bag:'dand',label:'민들레 날로 먹기',cost:5,ok:true,fn:()=>{I.dand--;S.food=clamp100(S.food+8);log('쓰다. 그래도 먹을 수 있는 풀이다. (식량 +8)')}});
   if(I.mush){
-    a.push({label:'모르는 버섯 먹기',cost:5,ok:true,fn:()=>{I.mush--;S.ateMush=true;S.hp-=15;S.sick=true;S.food=clamp100(S.food+5);emote('sweat');log('한 입 먹자마자 혀가 얼얼하고 속이 뒤집혔다. 먹지 말 걸 그랬다. (체력 -15, 배탈)')}});
-    a.push({label:'버섯 버리기',cost:2,ok:true,fn:()=>{S.threwMush=(S.threwMush||0)+I.mush;I.mush=0;log('모르는 건 먹지 않는다. 버섯을 덤불에 던졌다.')}});
+    a.push({bag:'mush',label:'모르는 버섯 먹기',cost:5,ok:true,fn:()=>{I.mush--;S.ateMush=true;S.hp-=15;S.sick=true;S.food=clamp100(S.food+5);emote('sweat');log('한 입 먹자마자 혀가 얼얼하고 속이 뒤집혔다. 먹지 말 걸 그랬다. (체력 -15, 배탈)')}});
+    a.push({bag:'mush',label:'버섯 버리기',cost:2,ok:true,fn:()=>{S.threwMush=(S.threwMush||0)+I.mush;I.mush=0;log('모르는 건 먹지 않는다. 버섯을 덤불에 던졌다.')}});
   }
 });
 MONO[4]=()=>{
@@ -1230,19 +1262,19 @@ DAY_HOOKS.actions.push((o,a)=>{
 });
 DAY_HOOKS.global.push(a=>{
   if(!S||S.day<5||!S.wound)return;const I=S.inv;
-  if(S.wound==='bleed')a.unshift({label:'상처 눌러 지혈하기',cost:10,ok:!!I.cloth||(I.bandage||0)>0,why:'누를 천이 없다',fn:()=>{S.wound='stopped';emote('…');log('팔을 심장보다 높이 들고 천으로 상처를 꾹 눌렀다. 한참 만에 피가 멎었다.')}});
+  if(S.wound==='bleed')a.unshift({bag:I.cloth?'cloth':'bandage',label:'상처 눌러 지혈하기',cost:10,ok:!!I.cloth||(I.bandage||0)>0,why:'누를 천이 없다',fn:()=>{S.wound='stopped';emote('…');log('팔을 심장보다 높이 들고 천으로 상처를 꾹 눌렀다. 한참 만에 피가 멎었다.')}});
   if(S.wound==='stopped'&&!S.cleaned){
-    if(I.bw==='boiled')a.unshift({label:'끓인 물로 상처 씻기',cost:10,ok:true,fn:()=>{I.bw=null;S.cleaned=true;S.badWash=false;log('식힌 물을 조금씩 부어 흙과 녹 부스러기를 씻어 냈다. 따끔하지만 깨끗해졌다.')}});
-    else if(I.bw==='dirty'||I.bw==='filtered')a.push({label:'병에 든 물로 상처 씻기',cost:10,ok:true,fn:()=>{I.bw=null;S.cleaned=true;S.badWash=true;emote('sweat');log('일단 병에 든 물로 씻었다. 끓이지 않은 물인데 괜찮을까.')}});
-    else if(I.bw==='rain')a.push({label:'빗물로 상처 씻기',cost:10,ok:true,fn:()=>{I.bw=null;S.cleaned=true;S.badWash=false;log('맑은 빗물로 상처를 씻었다. 끓인 물이면 더 좋았겠지만.')}});
+    if(I.bw==='boiled')a.unshift({bag:'bottle',label:'끓인 물로 상처 씻기',cost:10,ok:true,fn:()=>{I.bw=null;S.cleaned=true;S.badWash=false;log('식힌 물을 조금씩 부어 흙과 녹 부스러기를 씻어 냈다. 따끔하지만 깨끗해졌다.')}});
+    else if(I.bw==='dirty'||I.bw==='filtered')a.push({bag:'bottle',label:'병에 든 물로 상처 씻기',cost:10,ok:true,fn:()=>{I.bw=null;S.cleaned=true;S.badWash=true;emote('sweat');log('일단 병에 든 물로 씻었다. 끓이지 않은 물인데 괜찮을까.')}});
+    else if(I.bw==='rain')a.push({bag:'bottle',label:'빗물로 상처 씻기',cost:10,ok:true,fn:()=>{I.bw=null;S.cleaned=true;S.badWash=false;log('맑은 빗물로 상처를 씻었다. 끓인 물이면 더 좋았겠지만.')}});
   }
   if(S.wound==='stopped'&&S.cleaned){
-    if((I.bandage||0)>0)a.unshift({label:'붕대로 감싸기',cost:10,ok:true,fn:()=>{I.bandage--;dressDone(true,'새 붕대로 상처를 단단히 감쌌다. 하얀 붕대가 이렇게 반가울 줄이야.')}});
-    else if(I.cloth)a.push({label:S.clothBoiled?'소독한 헝겊으로 감싸기':'헝겊으로 감싸기',cost:10,ok:true,fn:()=>dressDone(S.clothBoiled,S.clothBoiled?'삶아 말린 헝겊으로 상처를 감쌌다.':'더러운 헝겊으로 일단 감쌌다. 찜찜하다.')});
+    if((I.bandage||0)>0)a.unshift({bag:'bandage',label:'붕대로 감싸기',cost:10,ok:true,fn:()=>{I.bandage--;dressDone(true,'새 붕대로 상처를 단단히 감쌌다. 하얀 붕대가 이렇게 반가울 줄이야.')}});
+    else if(I.cloth)a.push({bag:'cloth',label:S.clothBoiled?'소독한 헝겊으로 감싸기':'헝겊으로 감싸기',cost:10,ok:true,fn:()=>dressDone(S.clothBoiled,S.clothBoiled?'삶아 말린 헝겊으로 상처를 감쌌다.':'더러운 헝겊으로 일단 감쌌다. 찜찜하다.')});
   }
   if(I.pills){
-    a.push({label:'정체 모를 알약 먹기',cost:5,ok:true,fn:()=>{I.pills=0;S.atePills=true;S.hp-=5;emote('sweat');log('유통기한이 수십 년 지난 약이다. 속만 메스꺼워졌다. (체력 -5)')}});
-    a.push({label:'알약 버리기',cost:2,ok:true,fn:()=>{I.pills=0;S.threwPills=true;log('이름도 모르는 약은 먹지 않는다. 알약 통을 버렸다.')}});
+    a.push({bag:'pills',label:'정체 모를 알약 먹기',cost:5,ok:true,fn:()=>{I.pills=0;S.atePills=true;S.hp-=5;emote('sweat');log('유통기한이 수십 년 지난 약이다. 속만 메스꺼워졌다. (체력 -5)')}});
+    a.push({bag:'pills',label:'알약 버리기',cost:2,ok:true,fn:()=>{I.pills=0;S.threwPills=true;log('이름도 모르는 약은 먹지 않는다. 알약 통을 버렸다.')}});
   }
 });
 function dressDone(clean,msg){S.wound='dressed';S.dressClean=clean&&!S.badWash;if(S.dressClean&&S.infected){S.infected=false;log('다시 깨끗하게 처치했다. 열이 조금 내리는 것 같다.')}emote(S.dressClean?'♥':'sweat');log(msg)}
@@ -1258,9 +1290,9 @@ DAY_HOOKS.tick.push(m=>{
 });
 MONO[5]=()=>{
   const I=S.inv;let s;const hasCloth=!!I.cloth||(I.bandage||0)>0;
-  if(S.wound==='bleed')s=hasCloth?'팔에서 피가 계속 난다. 천으로 꾹 눌러 피부터 멈추자.':'피가 멎지 않는다. 누를 천이 없다. 서쪽 끝 무너진 약국에 뭐가 남아 있을지도.';
-  else if(S.wound==='stopped'&&!S.cleaned)s=S.infected?'상처가 덧났다. 끓인 물로 다시 씻어 내자.':I.bw==='boiled'?'피는 멎었다. 끓여 식힌 물로 상처를 씻자.':'상처를 씻어야 한다. 강물은 안 된다. 물을 끓이자.';
-  else if(S.wound==='stopped')s=(I.bandage||0)>0?'붕대로 감싸자.':S.clothBoiled?'소독한 헝겊으로 감싸자.':'깨끗한 천이 필요하다. 헝겊을 끓여 소독하거나, 서쪽 약국에 붕대가 있을지도.';
+  if(S.wound==='bleed')s=hasCloth?'팔에서 피가 계속 난다. 배낭의 천을 눌러, 꾹 눌러 피부터 멈추자.':'피가 멎지 않는다. 누를 천이 없다. 서쪽 끝 무너진 약국에 뭐가 남아 있을지도.';
+  else if(S.wound==='stopped'&&!S.cleaned)s=S.infected?'상처가 덧났다. 끓인 물로 다시 씻어 내자.':I.bw==='boiled'?'피는 멎었다. 배낭의 끓인 물로 상처를 씻자.':'상처를 씻어야 한다. 강물은 안 된다. 물을 끓이자.';
+  else if(S.wound==='stopped')s=(I.bandage||0)>0?'배낭의 붕대로 감싸자.':S.clothBoiled?'소독한 헝겊으로 감싸자.':'깨끗한 천이 필요하다. 헝겊을 끓여 소독하거나, 서쪽 약국에 붕대가 있을지도.';
   else if(I.pills)s='알약… 이름도 모르는 약은 먹지 않는 게 좋겠지.';
   else s=S.t<17*60?'처치는 끝났다. 오늘은 무리하지 말자. 저녁에 붓거나 열이 나는지 지켜보자.':'오늘은 일찍 쉬자.';
   if(!S.pharmacyDone&&S.wound==='dressed'&&S.t<17*60&&!S.found.graffiti)s+=' 서쪽 끝, 아직 안 가 본 곳이 있다.';
@@ -1451,7 +1483,7 @@ function frame(now){
     if(S.running)renderUI();
   }
   draw(now);
-  if(S&&S.running)placeRing(false);else if(ringEl.children.length&&!ov.classList.contains('hide')){ringEl.innerHTML='';capEl.innerHTML='';lastActKey=''}
+  if(S&&S.running)placeRing();else if(ringEl.classList.contains('on')&&!ov.classList.contains('hide')){ringEl.classList.remove('on');ringEl.innerHTML='';closeBag();lastActKey=''}
   requestAnimationFrame(frame);
 }
 
@@ -1602,7 +1634,7 @@ const DAYS={
      intro:()=>`<h2>마지막 사람</h2><div class="sub">멸망 후 50년 · 1일차 — 물이 탁해졌다</div>
   <p>마지막으로 사람 목소리를 들은 게 언제였는지 기억나지 않는다. 도시는 숲이 되었고, 나는 강가의 작은 쉼터에서 하루하루를 지낸다.</p>
   <p>어젯밤 비가 그친 뒤로 강물이 흙빛이다. 마실 물을 구해야 한다.<br>그리고 오늘은, 조금 멀리까지 걸어 볼 생각이다.</p>
-  <p class="small">✦ 반짝이는 곳에는 50년 전의 물건이 있습니다. 가져가서 쉼터에 둘 수도, 그 자리에 둘 수도 있어요.<br>자동차, 빗물통, 덤불, 바위처럼 주변 사물에 다가가면 만져 볼 수 있어요.<br>물을 얻는 방법은 하나가 아닙니다. 위쪽 💭 혼잣말이 넌지시 알려 줍니다.<br>어둡게 가려진 곳은 아직 가 보지 않은 곳입니다. 걸어가면 밝혀져요.<br>이동: WASD·방향키 또는 화면 탭 · 행동: 주인공 주변에 뜨는 아이콘을 누르거나 Space·숫자키 · ⏸ 일시정지(P) · ☰ 날짜 선택<br>하루는 저절로 끝나지 않아요. 쉼터 잠자리에서 잠들 때 끝납니다.</p>`},
+  <p class="small">✦ 반짝이는 곳에는 50년 전의 물건이 있습니다. 가져가서 쉼터에 둘 수도, 그 자리에 둘 수도 있어요.<br>자동차, 빗물통, 덤불, 바위처럼 주변 사물에 다가가면 만져 볼 수 있어요.<br>물을 얻는 방법은 하나가 아닙니다. 위쪽 💭 혼잣말이 넌지시 알려 줍니다.<br>어둡게 가려진 곳은 아직 가 보지 않은 곳입니다. 걸어가면 밝혀져요.<br>이동: WASD·방향키 또는 화면 탭 · 행동: 주인공 옆에 뜨는 메뉴를 누르거나 Space·숫자키 · 먹기·마시기는 배낭의 물건을 눌러서 · ⏸ 일시정지(P) · ☰ 날짜 선택<br>하루는 저절로 끝나지 않아요. 쉼터 잠자리에서 잠들 때 끝납니다.</p>`},
   2:{theme:'폭풍이 온다',wake:'눈을 떴다. 바람 소리가 심상치 않다.',
      intro:()=>`<h2>2일차</h2><div class="sub">폭풍이 온다</div>
   <p>아침부터 바람 냄새가 다르다. 하늘 한쪽이 무겁게 내려앉았다.<br>오후 세 시쯤이면 폭풍이 들이닥칠 것이다.</p>
