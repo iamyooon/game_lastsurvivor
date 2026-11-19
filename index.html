@@ -1172,7 +1172,7 @@ addPOI({id:'stickspot',day:6,x:470,y:330,r:24,name:'쉼터 앞 공터'});
 FINDS.push({id:'routemap',day:6,x:612,y:36,kind:'mem',name:'버스 노선도 조각',
   text:'정류장 뒤 수풀에서 녹슨 노선도 판 조각을 주웠다.\n강을 따라 북쪽으로 이어지던 파란 선이 산 앞에서 끊겼다. 끝에 「북부 대피소」.\n\n그 옆에 누군가 펜으로 동그라미를 쳐 놓았다.\n「배 — 강 하구 선착장」'});
 
-ON_START[6]=()=>{S.stick=null};
+ON_START[6]=()=>{S.stick=null;if(S.wound){if(S.wound!=='dressed'||S.infected)S.hp=Math.max(30,S.hp-10);S.wound=null;S.infected=false}};
 PRESET[6]=()=>{const I=S.inv;I.bandage=0;S.pharmacyDone=true;S.found.graffiti='seen';S.notes=[1,2,3,4,5];[[44,254],[34,226]].forEach(([x,y])=>revealOn(S.fog,x,y,12))};
 
 function northCount(){return [S.sawSunrise,S.shadowDone,S.foundPolaris].filter(Boolean).length}
