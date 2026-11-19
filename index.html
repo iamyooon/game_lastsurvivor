@@ -123,6 +123,8 @@
     #ov{position:fixed}
   }
   /* phones: the camera follows the hero; layouts per orientation */
+  body[data-mode=phoneP] #mono{flex-direction:column;gap:3px}
+  body[data-mode=phoneP] #count{white-space:normal;align-self:flex-start}
   body[data-mode=phoneP] #wrap{padding:4px;min-width:0;max-width:min(100%,calc((100vh - 235px) * .8))}
   body[data-mode=phoneL] #wrap{padding:0;min-width:0;max-width:none}
   body[data-mode=phoneL] #game{border-width:0;box-shadow:none}
