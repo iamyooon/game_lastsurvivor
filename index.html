@@ -1010,6 +1010,86 @@ DAY_HOOKS.draw.push(now=>{
   // smoke from a dying fire
   if(S.fire&&S.fireWeak){for(let i=0;i<4;i++){const t=((now/30+i*20)%60)/60;P(lc,198+Math.sin(t*6+i)*3,166-t*20,`rgba(220,220,220,${.5*(1-t)})`,2,2)}}
 });
+// ===== DAY 4 · 배가 고프다 (먹을 것 구하기) =====
+addIcons({
+  wire:[['.......','..mmm..','.m...m.','m..m..m','.m...m.','..mmm.m','......m'],{m:'#9a9a94'}],
+  rod:[['......t','.....t.','....t.w','...t..w','..t...w','.t....h','t......'],{t:'#8a6a44',w:'#e8e2d2',h:'#9a9a94'}],
+  worm:[['.......','.......','.pp....','p..p.pp','....pp.','.......','.......'],{p:'#c87a7a'}],
+  fish:[['.......','..sss..','.ssssss','ssskssS','.ssssss','..sss..','.......'],{s:'#8aa0a8',S:'#5a7078',k:'#1e1a16'}],
+  dfish:[['.......','..bbb..','.bbbbbb','bbbkbbB','.bbbbbb','..bbb..','.......'],{b:'#a0784a',B:'#6a4a2a',k:'#1e1a16'}],
+  dand:[['..y.y..','.yyyyy.','..yyy..','...g...','.g.g.g.','..ggg..','...g...'],{y:'#f0c838',g:'#4f8a3a'}],
+  mush:[['.rrrrr.','rrwrrwr','rrrrrrr','..www..','..www..','..www..','.......'],{r:'#c83a30',w:'#ece6d6'}],
+  diary:[['bbbbbb.','bpppbb.','bpkpbb.','bpppbb.','bpkkbb.','bpppbb.','bbbbb..'],{b:'#3a5a7a',p:'#e8e0cc',k:'#6a6a6a'}],
+});
+INV_EXTRA.push(['wire','녹슨 철사'],['rod','낚싯대'],['worm','지렁이'],['fish','물고기'],['dfish','말린 생선'],['dand','민들레'],['mush','모르는 버섯']);
+addPOI({id:'wirepile',day:4,x:150,y:186,r:24,name:'녹슨 철사 더미'});
+addPOI({id:'mud',day:4,x:606,y:458,r:26,name:'강 하류 진흙밭'});
+addPOI({id:'dandfield',day:4,x:420,y:58,r:30,name:'언덕 아래 민들레'});
+addPOI({id:'mushroom',day:4,x:318,y:428,r:24,name:'숲 가장자리 버섯'});
+FINDS.push({id:'diary',day:4,at:99*60,x:640,y:300,kind:'mem',name:'젖은 가방 속 수첩',
+  text:'낚싯줄에 걸려 올라온 젖은 가방. 비닐에 싸인 수첩이 들어 있었다. 몇 장만 읽을 수 있다.\n\n「9월 2일. 막차는 오지 않았다. 수아는 우산을 꼭 쥐고 울지 않았다.」\n「9월 5일. 강가 오두막에 자리를 잡았다. 수아가 라디오를 고쳤다.」\n\n강가 오두막. 라디오.\n…내 쉼터다.'});
+
+ON_START[4]=()=>{S.food=Math.min(S.food,28);S.fishTry=0;S.mushLeft=2;S.dandLeft=3;S.wormLeft=3;if(S.inv.can)S.inv.can=0};
+PRESET[4]=()=>{const I=S.inv;I.flint=1;I.steel=1;I.bark=1;I.twig=2;S.fireSkill=true;S.notes=[1,2,3];S.storedWood=0;I.wood=2;S.found.burntphoto='placed';S.placedOrder.push('burntphoto');[[60,440],[628,70],[36,318]].forEach(([x,y])=>revealOn(S.fog,x,y,12))};
+
+DAY_HOOKS.actions.push((o,a)=>{
+  if(!o||S.day<4)return;const I=S.inv;
+  if(o.id==='wirepile')a.push({label:'철사 풀어 오기',cost:20,ok:!I.wire&&!I.rod,why:'이미 챙겼다',fn:()=>{I.wire=1;log('콘크리트에 박힌 철사를 비틀어 한 토막 끊어 냈다. 끝을 구부리면 바늘이 되겠다. (녹슨 철사)')}});
+  if(o.id==='mud')a.push({label:'진흙 파기',cost:20,ok:(S.wormLeft||0)>0,why:'더 파도 안 나온다',fn:()=>{S.wormLeft--;I.worm=(I.worm||0)+2;log('축축한 진흙을 손으로 헤집자 지렁이가 꿈틀거린다. (지렁이 +2)')}});
+  if(o.id==='dandfield')a.push({label:'민들레 캐기',cost:15,ok:(S.dandLeft||0)>0,why:'남은 게 없다',fn:()=>{S.dandLeft--;I.dand=(I.dand||0)+1;log('톱니 같은 잎, 노란 꽃. 확실히 아는 풀이다. 뿌리째 캤다. (민들레 +1)')}});
+  if(o.id==='mushroom')a.push({label:'버섯 따기',cost:10,ok:(S.mushLeft||0)>0,why:'더 없다',fn:()=>{S.mushLeft--;I.mush=(I.mush||0)+1;emote('?');log('붉은 갓에 하얀 점. 처음 보는 버섯이다. 일단 따긴 했는데… (모르는 버섯 +1)')}});
+  if(o.id==='shelter'&&I.wire&&!I.rod)a.push({label:'낚싯대 만들기 (철사·헝겊·잔가지)',cost:30,ok:!!I.cloth&&(I.twig||0)>=1,why:!I.cloth?'실로 쓸 헝겊이 없다':'낚싯대로 쓸 잔가지가 없다',fn:()=>{I.wire=0;I.twig--;I.rod=1;emote('!');log('헝겊 가장자리를 풀어 실을 꼬고, 철사 끝을 구부려 바늘을 만들었다. 긴 가지에 묶으니 그럴듯하다. (낚싯대)')}});
+  if(o.id==='river'&&I.rod)a.unshift({label:'낚시하기 (지렁이 1)',cost:40,ok:(I.worm||0)>0,why:'미끼가 없다',fn:fishOnce});
+  if(o.id==='fire'&&S.fire){
+    if(I.fish)a.push({label:'생선 구워 먹기',cost:20,ok:true,fn:()=>{I.fish--;S.ateFish=(S.ateFish||0)+1;S.food=clamp100(S.food+25);S.mind=clamp100(S.mind+4);emote('♥');log('속을 따고 꼬챙이에 꿰어 노릇하게 구웠다. 뜨겁고 짭조름하다. (식량 +25)')}});
+    if(I.fish)a.push({label:'생선 연기에 말리기',cost:60,ok:true,fn:()=>{I.fish--;I.dfish=(I.dfish||0)+1;log('불 위에 생가지로 선반을 엮어 생선을 올리고 연기를 쐬었다. 며칠은 두고 먹을 수 있다. (말린 생선 +1)')}});
+    if(I.dand)a.push({label:'민들레 데쳐 먹기',cost:15,ok:!!I.bw,why:'데칠 물이 없다',fn:()=>{I.dand--;S.food=clamp100(S.food+12);log('끓는 물에 민들레를 살짝 데쳤다. 쌉싸름하지만 속이 든든하다. (식량 +12)')}});
+  }
+});
+function fishOnce(){
+  const I=S.inv;I.worm--;S.fishTry=(S.fishTry||0)+1;
+  if(S.fishTry===2&&!S.found.diary){log('묵직하다! 끌어올리니 물고기가 아니라 젖은 가방이다.');setTimeout(()=>showFind(FINDS.find(f=>f.id==='diary')),50);return}
+  if(S.fishTry===1||Math.random()<.6){I.fish=(I.fish||0)+1;emote('!');log(S.fishTry===1?'찌가 쑥 들어갔다! 손바닥만 한 붕어를 낚았다. (물고기 +1)':'또 한 마리! (물고기 +1)')}
+  else{emote('…');log('입질만 몇 번 하더니 미끼를 뺏겼다.')}
+}
+DAY_HOOKS.global.push(a=>{
+  if(!S||S.day<4)return;const I=S.inv;
+  if(I.dfish)a.push({label:'말린 생선 먹기',cost:10,ok:true,fn:()=>{I.dfish--;S.food=clamp100(S.food+20);emote('♥');log('딱딱하지만 씹을수록 고소하다. (식량 +20)')}});
+  if(I.dand&&!(S.fire&&I.bw))a.push({label:'민들레 날로 먹기',cost:5,ok:true,fn:()=>{I.dand--;S.food=clamp100(S.food+8);log('쓰다. 그래도 먹을 수 있는 풀이다. (식량 +8)')}});
+  if(I.mush){
+    a.push({label:'모르는 버섯 먹기',cost:5,ok:true,fn:()=>{I.mush--;S.ateMush=true;S.hp-=15;S.sick=true;S.food=clamp100(S.food+5);emote('sweat');log('한 입 먹자마자 혀가 얼얼하고 속이 뒤집혔다. 먹지 말 걸 그랬다. (체력 -15, 배탈)')}});
+    a.push({label:'버섯 버리기',cost:2,ok:true,fn:()=>{S.threwMush=(S.threwMush||0)+I.mush;I.mush=0;log('모르는 건 먹지 않는다. 버섯을 덤불에 던졌다.')}});
+  }
+});
+MONO[4]=()=>{
+  const I=S.inv;let s;
+  const fishTotal=(I.fish||0)+(I.dfish||0)+(S.ateFish||0);
+  if(S.food<35&&!I.rod&&!I.wire)s='배가 고프다. 먹을 게 다 떨어졌다. 강에서 물고기를 잡아 볼까. 무너진 건물에 녹슨 철사가 있었던 것 같다.';
+  else if(I.wire&&!I.rod)s='철사를 구했다. 쉼터에서 헝겊 실과 잔가지로 낚싯대를 만들자.';
+  else if(I.rod&&!(I.worm>0)&&!I.fish&&!I.dfish&&!S.ateFish)s='미끼가 필요하다. 강 하류 진흙밭을 파면 지렁이가 있을 것이다.';
+  else if(I.rod&&I.worm>0&&!I.fish&&!I.dfish&&!S.ateFish)s='강가로 가서 낚싯대를 드리우자.';
+  else if(I.fish&&!S.fire)s='물고기다! 불을 피워 익혀 먹자. 날로는 안 된다.';
+  else if(I.fish)s='남은 생선은 연기에 말려 두면 며칠은 먹을 수 있다.';
+  else if(I.mush)s='이 붉은 버섯… 먹어도 될까. 모르는 건 먹지 않는 게 원칙이다.';
+  else s=S.t>=19*60?'배는 채웠다. 쉼터로 돌아가 쉬자.':'숲 가장자리엔 버섯이, 언덕 아래엔 민들레가 있다. 아는 것만 먹자.';
+  if(S.carry.length&&S.t<18*60)s+=' 배낭 속 물건은 쉼터에 가져다 두자.';
+  return {s,count:`먹을 것 — 낚싯대 ${ck(I.rod)} · 미끼 ${I.worm||0} · 물고기 ${I.fish||0} · 말린 생선 ${I.dfish||0}`};
+};
+DAY_HOOKS.draw.push(now=>{
+  if(S.day<4)return;
+  // wire coil in the ruins
+  if(!S.inv.wire&&!S.inv.rod){for(let i=0;i<10;i++){const a=i/10*Math.PI*2;P(lc,75+Math.cos(a)*3,93+Math.sin(a)*2,'#8a8a84')}P(lc,78,91,'#a8a8a0',3,1)}
+  // mud flat with puddles
+  seed=404;for(let i=0;i<90;i++){P(lc,293+rnd()*24,222+rnd()*12,rnd()<.5?'#4a3a28':'#3e3022')}
+  P(lc,298,226,'#5a7a8a',4,1);P(lc,307,230,'#5a7a8a',3,1);
+  for(let i=0;i<(S.wormLeft||0);i++)P(lc,296+i*6,229,'#c87a7a',2,1);
+  // dandelions
+  seed=505;const nd=(S.dandLeft||0)*5;for(let i=0;i<15;i++){const x=200+rnd()*22,y=24+rnd()*10;P(lc,x,y+1,'#3e6a2e');if(i<nd)P(lc,x,y,'#f0c838')}
+  // mushrooms
+  for(let i=0;i<(S.mushLeft||0);i++){const x=156+i*5,y=212;P(lc,x,y+1,'#ece6d6',2,2);P(lc,x-1,y,'#c83a30',4,1);P(lc,x,y-1,'#c83a30',2,1);P(lc,x,y,'#ece6d6')}
+  // fish drying rack over the fire
+  if(S.inv.dfish&&S.fire){P(lc,193,158,'#6a4a2c',14,1);P(lc,196,159,'#a0784a',3,2);P(lc,202,159,'#a0784a',3,2)}
+});
 // @@DAY_WORLD@@
 // ---------- loop ----------
 let last=performance.now();
@@ -1315,12 +1395,29 @@ JOURNAL[3]=(forced,home)=>{
   if(forced&&!home)L.push('불빛 없는 밤길을 더듬어 쉼터로 돌아왔다.');
   return L;
 };
+DAYS[4]={theme:'배가 고프다',wake:'눈을 떴다. 배 속이 텅 빈 소리를 낸다.',
+  intro:()=>`<h2>4일차</h2><div class="sub">배가 고프다</div>
+  <p>통조림도, 산딸기도 다 떨어졌다. 며칠째 제대로 먹지 못했다.</p>
+  <p>오늘은 <b>먹을 것을 스스로 구하는 법</b>을 익혀야 한다. 도구를 만들고, 잡고, 익히고, 남은 것은 오래 두고 먹을 수 있게.</p>
+  <p class="small">강 하류와 언덕 아래는 아직 잘 모르는 곳이다.<br>숲에는 처음 보는 버섯도 났다. 먹을 수 있다고 <b>확실히 아는 것</b>만 먹으세요.</p>`};
+NOTES[4]={title:'먹을 것 구하기',body:['먹을 수 있다고 확실히 아는 것만 먹는다. 모르는 버섯과 열매는 먹지 않는다.','민들레처럼 흔하고 헷갈리지 않는 식물부터 익힌다.','낚시: 바늘(구부린 철사), 실, 미끼(지렁이). 물살이 느린 곳을 노린다.','생선은 속을 따고 완전히 익혀 먹는다.','남은 고기는 연기에 말려(훈제) 오래 보관한다.'],
+  did:()=>[(S.inv.rod||S.fishTry)?'낚싯대 만들기':null,S.fishTry?'낚시':null,S.inv.dfish?'생선 훈제':null,S.ateMush?'모르는 버섯 먹고 탈남':S.threwMush?'모르는 버섯 버리기':null].filter(Boolean).join(' · ')||'아직 못 해 봄'};
+JOURNAL[4]=(forced,home)=>{
+  const I=S.inv,L=['4일차.'];
+  if(S.fishTry)L.push((I.fish||I.dfish||S.food>40)?'철사를 구부려 바늘을 만들고 헝겊을 풀어 실을 꼬았다. 첫 입질에 손이 떨렸다.':'낚싯대를 만들어 강에 드리웠지만 오늘은 운이 없었다.');
+  else L.push('먹을 것을 구하지 못했다. 배를 움켜쥐고 잠든다.');
+  if(I.dfish)L.push('남은 생선은 연기에 말렸다. 내일 먹을 것이 있다는 게 이렇게 든든할 줄이야.');
+  if(S.ateMush)L.push('모르는 버섯을 먹었다가 혼쭐이 났다. 다시는.');
+  else if(S.threwMush)L.push('붉은 버섯은 버렸다. 모르는 건 먹지 않는다.');
+  if(S.found.diary)L.push('낚싯줄에 걸려 올라온 가방 속 수첩. 「강가 오두막에 자리를 잡았다. 수아가 라디오를 고쳤다.」 여기가 그 오두막이다. 저 라디오가 그 라디오다.');
+  return L;
+};
 // @@DAY_SCREENS@@
 const WEEK=[
   {d:1,theme:'물이 탁해졌다',skill:'식수 만들기',ready:true},
   {d:2,theme:'폭풍이 온다',skill:'쉼터와 체온',ready:true},
   {d:3,theme:'불씨가 꺼졌다',skill:'불 피우기',ready:true},
-  {d:4,theme:'배가 고프다',skill:'먹을 것 구하기'},
+  {d:4,theme:'배가 고프다',skill:'먹을 것 구하기',ready:true},
   {d:5,theme:'다쳤다',skill:'응급처치'},
   {d:6,theme:'북쪽은 어디일까',skill:'방향 찾기'},
   {d:7,theme:'누군가에게',skill:'구조 신호 보내기'},
