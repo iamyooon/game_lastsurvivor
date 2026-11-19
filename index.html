@@ -97,7 +97,7 @@
       <div id="hudTop" class="band">
         <div id="dayInfo"><span id="title">1일차</span><span id="themeTxt">물이 탁해졌다</span><span id="clock">06:00</span></div>
         <div id="stats"></div>
-        <div id="topBtns"><button id="menuBtn" class="ib" title="날짜 선택">☰</button><button id="mute" class="ib" title="배경음악">♪ ON</button></div>
+        <div id="topBtns"><button id="pauseBtn" class="ib" title="일시정지">⏸</button><button id="menuBtn" class="ib" title="날짜 선택">☰</button><button id="mute" class="ib" title="배경음악">♪ ON</button></div>
       </div>
       <canvas id="cv" width="800" height="480"></canvas>
       <div id="dialog" class="band">
@@ -242,7 +242,9 @@ function actionsFor(o){
     case 'radio':
       a.push({label:'라디오 켜기',cost:20,ok:true,fn:useRadio});break;
     case 'bed':
-      a.push({label:'잠들기 (하루 마치기)',cost:0,ok:S.t>=15*60,why:'아직 해가 높다 (15시 이후)',fn:()=>endDay(false)});break;
+      a.push({label:'잠들기 (하루 마치기)',cost:0,ok:S.t>=15*60,why:'아직 해가 높다 (15시 이후)',fn:()=>endDay(false)});
+      a.push({label:'쉬며 기다리기 (1시간)',cost:60,ok:S.t<29*60,why:'곧 날이 밝는다',fn:()=>{S.mind=Math.min(100,S.mind+2);log(stormLevel()>.2?'빗소리를 들으며 한 시간쯤 누워 있었다.':S.t>=19*60?'어둠 속에 누워 한 시간쯤 숨을 골랐다.':'잠자리에 누워 한 시간쯤 쉬었다. 천장 틈으로 빛이 움직인다.')}});
+      break;
   }
   return a;
 }
@@ -335,15 +337,16 @@ function advance(m){
     if(S.warm<=0)S.hp-=.1*m;
     if(S.warm<30)S.mind-=.03*m;
   }
-  S.water-=0.035*m; S.food-=0.022*m; S.mind-=0.012*m;
+  S.water-=0.035*m; S.food-=0.022*m; S.mind-=(S.t>=23*60?0.03:0.012)*m;
   if(S.sick)S.hp-=0.012*m;
   if(S.water<=0){S.water=0;S.hp-=0.05*m}
   if(S.food<=0){S.food=0;S.hp-=0.03*m}
   if(S.mind<=0){S.mind=0;S.hp-=0.02*m}
   S.hp=Math.min(100,S.hp);
   if(S.hp<=0){S.hp=0;gameOver();return}
-  if(S.t>=20*60&&!S.warnedDark){S.warnedDark=true;log('해가 거의 졌다. 21시가 되기 전에 쉼터로 돌아가자.')}
-  if(S.t>=21*60)endDay(true);
+  if(S.t>=20*60&&!S.warnedDark){S.warnedDark=true;log('해가 졌다. 쉼터 잠자리에서 잠들면 하루가 끝난다. 서두를 필요는 없다.')}
+  if(S.t>=24*60&&!S.warnedLate){S.warnedLate=true;log('자정이 넘었다. 밤공기가 차다.')}
+  if(S.t>=29.5*60){S.t=29.5*60;if(!S.warnedDawn){S.warnedDawn=true;log('곧 동이 튼다. 이제는 잠들어야 할 것 같다.')}}
 }
 function doAction(a){
   if(!S.running||!a||!a.ok)return;
@@ -379,7 +382,7 @@ function monologue(){
   if(S.day===2)return monologue2();
   const I=S.inv,mem=FINDS.filter(f=>f.kind==='mem'&&S.found[f.id]).length;
   let s;
-  if(S.t>=18*60)s='해가 기운다. 이제 쉼터로 돌아가 쉬자.';
+  if(S.t>=18*60)s=S.t>=20*60?'밤이다. 더 둘러봐도 되고, 쉼터에 누워 하루를 마쳐도 된다.':'해가 기운다. 어두워지기 전에 쉼터 쪽으로 돌아가자.';
   else if(!I.bottle&&!S.drankClean)s='강물이 흙빛이다. 물을 담을 그릇부터 찾아야겠다. 무너진 건물 쪽에서 뭔가 반짝였다.';
   else if(!S.drankClean&&!I.bw&&!S.barrel)s='병은 구했다. 어젯밤 비가 쉼터 옆 통에 고였을지도. 아니면 강물을 떠다 끓이거나.';
   else if(!S.drankClean&&!I.bw)s='강물을 떠 오자. 그냥은 못 마신다. 끓이든, 거르든.';
@@ -418,7 +421,7 @@ const statHTML=sfx=>STATS.map(([k,n,c])=>`<div class="stat"><span>${n}</span><di
 statsEl.innerHTML=statHTML('');document.getElementById('stats2').innerHTML=statHTML('2');
 let currentActions=[],lastActKey='',dirtyUI=true,lastSay='';
 function log(m){const p=document.createElement('p');p.textContent=m;logEl.prepend(p);while(logEl.children.length>6)logEl.lastChild.remove()}
-function fmt(t){const h=Math.floor(t/60),m=Math.floor(t%60);return String(h).padStart(2,'0')+':'+String(m).padStart(2,'0')}
+function fmt(t){const h=Math.floor(t/60)%24,m=Math.floor(t%60);return String(h).padStart(2,'0')+':'+String(m).padStart(2,'0')}
 function renderUI(){
   for(const [k] of STATS){const v=Math.max(0,S[k]);for(const x of ['','2']){document.getElementById('v_'+k+x).textContent=Math.round(v);document.getElementById('b_'+k+x).style.width=v+'%'}}
   clockEl.textContent=fmt(S.t);
@@ -894,7 +897,7 @@ const DAYS={
      intro:()=>`<h2>마지막 사람</h2><div class="sub">멸망 후 50년 · 1일차 — 물이 탁해졌다</div>
   <p>마지막으로 사람 목소리를 들은 게 언제였는지 기억나지 않는다. 도시는 숲이 되었고, 나는 강가의 작은 쉼터에서 하루하루를 지낸다.</p>
   <p>어젯밤 비가 그친 뒤로 강물이 흙빛이다. 마실 물을 구해야 한다.<br>그리고 오늘은, 조금 멀리까지 걸어 볼 생각이다.</p>
-  <p class="small">✦ 반짝이는 곳에는 50년 전의 물건이 있습니다. 가져가서 쉼터에 둘 수도, 그 자리에 둘 수도 있어요.<br>자동차, 빗물통, 덤불, 바위처럼 주변 사물에 다가가면 만져 볼 수 있어요.<br>물을 얻는 방법은 하나가 아닙니다. 위쪽 💭 혼잣말이 넌지시 알려 줍니다.<br>어둡게 가려진 곳은 아직 가 보지 않은 곳입니다. 걸어가면 밝혀져요.<br>이동: WASD·방향키 또는 화면 탭 · 행동: Space·숫자키 또는 오른쪽 아래 버튼 · ☰ 날짜 선택</p>`},
+  <p class="small">✦ 반짝이는 곳에는 50년 전의 물건이 있습니다. 가져가서 쉼터에 둘 수도, 그 자리에 둘 수도 있어요.<br>자동차, 빗물통, 덤불, 바위처럼 주변 사물에 다가가면 만져 볼 수 있어요.<br>물을 얻는 방법은 하나가 아닙니다. 위쪽 💭 혼잣말이 넌지시 알려 줍니다.<br>어둡게 가려진 곳은 아직 가 보지 않은 곳입니다. 걸어가면 밝혀져요.<br>이동: WASD·방향키 또는 화면 탭 · 행동: Space·숫자키 또는 오른쪽 아래 버튼 · ⏸ 일시정지(P) · ☰ 날짜 선택<br>하루는 저절로 끝나지 않아요. 쉼터 잠자리에서 잠들 때 끝납니다.</p>`},
   2:{theme:'폭풍이 온다',wake:'눈을 떴다. 바람 소리가 심상치 않다.',
      intro:()=>`<h2>2일차</h2><div class="sub">폭풍이 온다</div>
   <p>아침부터 바람 냄새가 다르다. 하늘 한쪽이 무겁게 내려앉았다.<br>오후 세 시쯤이면 폭풍이 들이닥칠 것이다.</p>
@@ -912,7 +915,7 @@ let dayStart=null;
 function startDay(n){
   if(n===1){S=fresh();S.fog=newFog()}
   else{
-    S.day=n;S.t=360;S.ended=false;S.running=false;S.warnedDark=false;S.stormMsgs={};
+    S.day=n;S.t=360;S.ended=false;S.running=false;S.warnedDark=false;S.warnedLate=false;S.warnedDawn=false;S.stormMsgs={};
     S.water=Math.max(15,S.water-12);S.food=Math.max(15,S.food-10);S.hp=Math.min(100,S.hp+10);S.mind=Math.max(20,S.mind);
     S.sick=false;S.fire=false;S.bush=0;S.rock=false;S.barrel=true;S.barrelFull=false;
     S.warm=80;S.wet=false;S.p={x:400,y:236,face:1,step:0};S.target=null;S.carry.forEach(id=>{S.found[id]='placed';S.placedOrder.push(id)});S.carry=[];
@@ -1036,6 +1039,15 @@ function showTitle(fromGame){
   card.querySelectorAll('.daylist button[data-d]').forEach(b=>{b.onclick=()=>{const n=+b.dataset.d;Sfx.play('pick');if(n===1)startDay(1);else{presetFor(n);startDay(n)}}});
   const r=document.getElementById('resume');if(r)r.onclick=()=>{ov.classList.add('hide');S.running=true;dirtyUI=true};
 }
+document.getElementById('pauseBtn').onclick=e=>{
+  e.currentTarget.blur();
+  if(!S||S.ended||!S.running||!ov.classList.contains('hide'))return;
+  S.running=false;
+  card.innerHTML=`<h2>잠시 멈춤</h2><div class="sub">${S.day}일차 · ${fmt(S.t)}</div><p class="small">시간이 멈춰 있습니다. 준비되면 이어서 하세요.</p><div class="btns"><button id="unpause">계속하기</button></div>`;
+  ov.classList.remove('hide');
+  document.getElementById('unpause').onclick=()=>{ov.classList.add('hide');S.running=true;dirtyUI=true};
+};
+addEventListener('keydown',e=>{if(e.key==='p'||e.key==='P'){const u=document.getElementById('unpause');if(u&&!ov.classList.contains('hide'))u.click();else document.getElementById('pauseBtn').click()}});
 document.getElementById('menuBtn').onclick=e=>{Music.start();showTitle(true);e.currentTarget.blur()};
 S=fresh();S.fog=newFog();
 showTitle(false);
