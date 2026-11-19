@@ -2,13 +2,13 @@
 <html lang="ko">
 <head>
 <meta charset="utf-8">
-<meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no">
 <link rel="preconnect" href="https://fonts.googleapis.com"><link href="https://fonts.googleapis.com/css2?family=Press+Start+2P&display=swap" rel="stylesheet">
 <title>마지막 사람 — 프로토타입</title>
 <style>
   :root{--bg:#0f0e12;--panel:rgba(22,20,26,.86);--solid:#1e1b22;--line:#3b3540;--edge:#0b0a0d;--text:#ece4d2;--dim:#a39b8c;--accent:#e8a84c}
   *{box-sizing:border-box}
-  html,body{margin:0;background:var(--bg);color:var(--text);font-family:system-ui,-apple-system,"Apple SD Gothic Neo","Noto Sans KR",sans-serif}
+  html,body{overscroll-behavior:none;margin:0;background:var(--bg);color:var(--text);font-family:system-ui,-apple-system,"Apple SD Gothic Neo","Noto Sans KR",sans-serif}
   #wrap{max-width:min(960px,calc((100vh - 215px) * 1.6667));min-width:min(100%,620px);margin:0 auto;padding:10px}
   #game{position:relative;background:#16141a;border:3px solid var(--line);box-shadow:0 0 0 3px var(--edge),6px 6px 0 3px var(--edge)}
   #stage{position:relative;line-height:1.4}
@@ -101,6 +101,29 @@
     .rb{width:40px;height:40px;margin:-20px 0 0 -20px}
     #ov{position:fixed}
   }
+  /* phones: the camera follows the hero; layouts per orientation */
+  body[data-mode=phoneP] #wrap{padding:4px;min-width:0;max-width:min(100%,calc((100vh - 235px) * .8))}
+  body[data-mode=phoneL] #wrap{padding:0;min-width:0;max-width:none}
+  body[data-mode=phoneL] #game{border-width:0;box-shadow:none}
+  body[data-mode=phoneL] #hudTop,body[data-mode=phoneL] #dialog{position:absolute;left:0;right:0;z-index:5;background:rgba(22,20,26,.8)}
+  body[data-mode=phoneL] #hudTop{top:0;padding:3px 8px;gap:8px}
+  body[data-mode=phoneL] #dialog{bottom:0;min-height:0;padding:4px 10px 5px;gap:3px}
+  body[data-mode=phoneL] #themeTxt,body[data-mode=phoneL] #log,body[data-mode=phoneL] #count{display:none}
+  body[data-mode=phoneL] .stat{grid-template-columns:auto 1fr;font-size:10px;white-space:nowrap;gap:3px}
+  body[data-mode=phoneL] .stat b{display:none}
+  body[data-mode=phoneL] #say{font-size:12.5px}
+  body[data-mode=phoneL] #inv{flex-wrap:nowrap;overflow-x:auto;min-height:0}
+  /* touch screens: finger-sized buttons */
+  @media (pointer:coarse){
+    .rb{width:46px;height:46px;margin:-23px 0 0 -23px}
+    .rb img{width:26px;height:26px}.rb img.s7{width:28px;height:28px}
+    .rb .n{display:none}
+    .ib{padding:6px 10px;font-size:13px}
+    .card button{padding:9px 14px}
+  }
+  @media (pointer:coarse) and (min-width:700px){
+    #say{font-size:15px}.stat{font-size:12px}#inv{font-size:13px}.card p{font-size:14.5px}
+  }
 </style>
 </head>
 <body>
@@ -110,7 +133,7 @@
       <div id="hudTop" class="band">
         <div id="dayInfo"><span id="title">1일차</span><span id="themeTxt">물이 탁해졌다</span><span id="clock">06:00</span></div>
         <div id="stats"></div>
-        <div id="topBtns"><button id="pauseBtn" class="ib" title="일시정지">⏸</button><button id="menuBtn" class="ib" title="날짜 선택">☰</button><button id="mute" class="ib" title="배경음악">♪ ON</button></div>
+        <div id="topBtns"><button id="fsBtn" class="ib" title="전체 화면">⛶</button><button id="pauseBtn" class="ib" title="일시정지">⏸</button><button id="menuBtn" class="ib" title="날짜 선택">☰</button><button id="mute" class="ib" title="배경음악">♪ ON</button></div>
       </div>
       <canvas id="cv" width="800" height="480"></canvas>
       <div id="ring"></div><div id="cap"></div>
@@ -131,7 +154,24 @@
 <script>
 (()=>{
 const cv=document.getElementById('cv'),ctx=cv.getContext('2d');
-const W=800,H=480;
+const W=800,H=480; // world size
+// camera: full map on big screens; on phones it zooms in and follows the hero
+const CAM={x:0,y:0,dx:0,dy:0,z:1,cw:800,ch:480,vw:800,vh:480,mode:'',snap:true};
+function applyLayout(){
+  const small=Math.min(innerWidth,innerHeight)<560,port=innerHeight>innerWidth;
+  const mode=small?(port?'phoneP':'phoneL'):'full';
+  // landscape phones fill the whole screen, so the canvas takes the screen's own aspect
+  const lch=Math.max(300,Math.min(480,Math.round(800*innerHeight/innerWidth/2)*2)),key=mode+(mode==='phoneL'?lch:'');
+  if(key===CAM.key)return;CAM.key=key;CAM.mode=mode;document.body.dataset.mode=mode;
+  if(mode==='phoneP'){CAM.cw=480;CAM.ch=600;CAM.z=1.5}else if(mode==='phoneL'){CAM.cw=800;CAM.ch=lch;CAM.z=2}else{CAM.cw=800;CAM.ch=480;CAM.z=1}
+  CAM.vw=CAM.cw/CAM.z;CAM.vh=CAM.ch/CAM.z;cv.width=CAM.cw;cv.height=CAM.ch;CAM.snap=true;
+}
+function updateCam(){
+  const p=S.p,tx=Math.max(0,Math.min(W-CAM.vw,p.x-CAM.vw/2)),ty=Math.max(0,Math.min(H-CAM.vh,p.y-CAM.vh/2));
+  if(CAM.snap){CAM.x=tx;CAM.y=ty;CAM.snap=false}else{CAM.x+=(tx-CAM.x)*.12;CAM.y+=(ty-CAM.y)*.12}
+  CAM.dx=Math.round(CAM.x/2)*2;CAM.dy=Math.round(CAM.y/2)*2; // whole buffer pixels keep the dots crisp
+}
+applyLayout();addEventListener('resize',applyLayout);addEventListener('orientationchange',()=>setTimeout(applyLayout,200));
 
 // ---------- things to find ----------
 // kind: 'use' = practical item, 'mem' = memory item (can be taken home or left)
@@ -436,7 +476,7 @@ addEventListener('keyup',e=>{keys[e.key.toLowerCase()]=false});
 cv.addEventListener('pointerdown',e=>{
   if(!S.running)return;
   const r=cv.getBoundingClientRect();
-  S.target={x:(e.clientX-r.left)*W/r.width,y:(e.clientY-r.top)*H/r.height};
+  S.target={x:CAM.dx+(e.clientX-r.left)/r.width*CAM.vw,y:CAM.dy+(e.clientY-r.top)/r.height*CAM.vh};
 });
 
 // ---------- UI ----------
@@ -466,13 +506,13 @@ function buildRing(o){
 }
 function placeRing(force){
   const n=ringEl.children.length;if(!n){capEl.innerHTML='';return}
-  const sx=cv.clientWidth/W,sy=cv.clientHeight/H,hx=S.p.x*sx,hy=cv.offsetTop+(S.p.y-4)*sy;
-  const bs=ringEl.children[0].offsetWidth||34,R=Math.max(bs*1.45,cv.clientWidth*.066),up=(S.p.y*sy)>R+44;
+  const sx=cv.clientWidth/CAM.vw,sy=cv.clientHeight/CAM.vh,hx=(S.p.x-CAM.dx)*sx,hy=cv.offsetTop+(S.p.y-4-CAM.dy)*sy;
+  const bs=ringEl.children[0].offsetWidth||34,R=Math.max(bs*1.45,cv.clientWidth*.066),up=((S.p.y-CAM.dy)*sy)>R+44;
   const step=2*Math.asin(Math.min(1,(bs+6)/(2*R)))*180/Math.PI,center=up?-90:90,spread=Math.min(210,step*(n-1));
   ringEl.style.left=hx+'px';ringEl.style.top=hy+'px';
   if(force||ringEl.dataset.up!==String(up)){ringEl.dataset.up=up;
     [...ringEl.children].forEach((b,i)=>{const ang=(center-spread/2+(n>1?spread*i/(n-1):0))*Math.PI/180;b.style.left=Math.cos(ang)*R+'px';b.style.top=Math.sin(ang)*R+'px'})}
-  capEl.style.left=hx+'px';capEl.style.top=(up?hy-R-24:hy+R+48)+'px';capEl.style.transform=up?'translate(-50%,-100%)':'translate(-50%,0)';
+  capEl.style.left=Math.max(90,Math.min(cv.clientWidth-90,hx))+'px';capEl.style.top=(up?hy-R-24:hy+R+48)+'px';capEl.style.transform=up?'translate(-50%,-100%)':'translate(-50%,0)';
 }
 function renderUI(){
   for(const [k] of STATS){const v=Math.max(0,S[k]);for(const x of ['','2']){document.getElementById('v_'+k+x).textContent=Math.round(v);document.getElementById('b_'+k+x).style.width=v+'%'}}
@@ -953,10 +993,11 @@ function draw(now){
     if(!fade||Math.floor(now/60)%2===0)lc.drawImage(EMO[S.emote.type],Math.round(L(p.x)-2),Math.round(L(p.y)-25)+lift+bob);
   }
   // upscale
-  ctx.imageSmoothingEnabled=false;ctx.drawImage(low,0,0,W,H);
+  updateCam();
+  ctx.imageSmoothingEnabled=false;ctx.drawImage(low,CAM.dx/2,CAM.dy/2,CAM.vw/2,CAM.vh/2,0,0,CAM.cw,CAM.ch);
   // small labels at full resolution
   ctx.font='bold 11px system-ui,sans-serif';ctx.textAlign='center';
-  [['무너진 건물',150,22,150,100],['숲',150,330,150,400],['쉼터',400,156,400,240],['강',740,20,640,240]].forEach(([t,x,y,ax,ay])=>{if(fogAt(ax,ay)<10)return;ctx.fillStyle='rgba(0,0,0,.6)';ctx.fillText(t,x+1,y+1);ctx.fillStyle='rgba(232,228,218,.75)';ctx.fillText(t,x,y)});
+  [['무너진 건물',150,22,150,100],['숲',150,330,150,400],['쉼터',400,156,400,240],['강',740,20,640,240]].forEach(([t,wx,wy,ax,ay])=>{if(fogAt(ax,ay)<10)return;const x=(wx-CAM.dx)*CAM.z,y=(wy-CAM.dy)*CAM.z;if(x<-40||y<-10||x>CAM.cw+40||y>CAM.ch+10)return;ctx.fillStyle='rgba(0,0,0,.6)';ctx.fillText(t,x+1,y+1);ctx.fillStyle='rgba(232,228,218,.75)';ctx.fillText(t,x,y)});
 }
 
 // ---------- day system: hooks every later day plugs into ----------
@@ -1789,6 +1830,9 @@ function showTitle(fromGame){
   card.querySelectorAll('.daylist button[data-d]').forEach(b=>{b.onclick=()=>{const n=+b.dataset.d;Sfx.play('pick');if(n===1)startDay(1);else{presetFor(n);startDay(n)}}});
   const r=document.getElementById('resume');if(r)r.onclick=()=>{ov.classList.add('hide');S.running=true;dirtyUI=true};
 }
+{const fs=document.getElementById('fsBtn');const root=document.documentElement;
+  if(!document.fullscreenEnabled||!root.requestFullscreen)fs.style.display='none';
+  fs.onclick=e=>{e.currentTarget.blur();try{if(document.fullscreenElement)document.exitFullscreen();else root.requestFullscreen().catch(()=>{})}catch(_){}}}
 document.getElementById('pauseBtn').onclick=e=>{
   e.currentTarget.blur();
   if(!S||S.ended||!S.running||!ov.classList.contains('hide'))return;
