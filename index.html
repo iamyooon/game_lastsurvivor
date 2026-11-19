@@ -46,7 +46,20 @@
   #inv{font-size:12px;flex:1 1 auto;display:flex;align-items:center;flex-wrap:wrap;min-height:30px}
   #inv .lbl{color:var(--dim);font-size:11px;margin-right:6px}
   #inv span.item{display:inline-flex;align-items:center;gap:3px;background:#0e0d10;border:1px solid var(--line);padding:1px 5px;margin:1px 3px 1px 0;white-space:nowrap}
-  #actions{flex:0 1 auto;display:flex;flex-wrap:wrap;gap:6px;justify-content:flex-end;align-items:center;max-width:62%}
+  #actions{display:none}
+  #ring{position:absolute;left:0;top:0;width:0;height:0;z-index:6;pointer-events:none}
+  .rb{position:absolute;width:34px;height:34px;margin:-17px 0 0 -17px;padding:0;display:flex;align-items:center;justify-content:center;pointer-events:auto;animation:rbIn .2s steps(3)}
+  .rb img{width:20px;height:20px;image-rendering:pixelated;pointer-events:none}
+  .rb img.s7{width:21px;height:21px}
+  .rb .n{position:absolute;right:2px;bottom:1px;font-family:"Press Start 2P",monospace;font-size:7px;color:var(--accent);text-shadow:1px 1px 0 #000}
+  .rb.no{filter:grayscale(.9);opacity:.6}
+  .rb.sel{outline:2px solid var(--accent);outline-offset:1px}
+  @keyframes rbIn{from{transform:scale(.4);opacity:0}to{transform:none;opacity:1}}
+  #cap{position:absolute;left:0;top:0;z-index:7;transform:translate(-50%,-100%);white-space:nowrap;background:rgba(14,13,17,.92);border:2px solid #000;box-shadow:inset 0 0 0 1px var(--line);padding:3px 8px;font-size:12px;pointer-events:none;color:var(--text)}
+  #cap .pl{color:var(--accent);margin-right:6px}
+  #cap .why{color:#d88a6a;margin-left:6px}
+  #cap .t{color:var(--dim);margin-left:6px;font-size:11px}
+  #cap:empty{display:none}
   #actions .where{font-size:11px;color:var(--accent);margin-right:2px}
   #actions .where:empty{display:none}
   button{font:inherit;font-size:13px;background:#4a3a26;color:var(--text);border:2px solid #000;box-shadow:inset -2px -2px 0 #2e2416,inset 2px 2px 0 #6e5638;padding:5px 10px;cursor:pointer;border-radius:0}
@@ -85,7 +98,7 @@
     #stats{order:3;flex-basis:100%;display:grid;grid-template-columns:repeat(3,1fr);gap:4px 10px}
     #topBtns{margin-left:auto}
     #hudBottom{flex-direction:column;align-items:stretch}
-    #actions{justify-content:flex-start;max-width:none}
+    .rb{width:40px;height:40px;margin:-20px 0 0 -20px}
     #ov{position:fixed}
   }
 </style>
@@ -100,6 +113,7 @@
         <div id="topBtns"><button id="pauseBtn" class="ib" title="일시정지">⏸</button><button id="menuBtn" class="ib" title="날짜 선택">☰</button><button id="mute" class="ib" title="배경음악">♪ ON</button></div>
       </div>
       <canvas id="cv" width="800" height="480"></canvas>
+      <div id="ring"></div><div id="cap"></div>
       <div id="dialog" class="band">
         <div id="mono"><span id="say"></span><span id="count"></span></div>
         <div id="log"></div>
@@ -427,6 +441,33 @@ statsEl.innerHTML=statHTML('');document.getElementById('stats2').innerHTML=statH
 let currentActions=[],lastActKey='',dirtyUI=true,lastSay='';
 function log(m){const p=document.createElement('p');p.textContent=m;logEl.prepend(p);while(logEl.children.length>6)logEl.lastChild.remove()}
 function fmt(t){const h=Math.floor(t/60)%24,m=Math.floor(t%60);return String(h).padStart(2,'0')+':'+String(m).padStart(2,'0')}
+const ringEl=document.getElementById('ring'),capEl=document.getElementById('cap');
+let ringSel=0,ringPlace='';
+function capText(i){const a=currentActions[i];if(!a)return '';
+  return `<span class="pl">${ringPlace}</span>${a.label}${a.cost?`<span class="t">${a.cost}분</span>`:''}${!a.ok&&a.why?`<span class="why">${a.why}</span>`:''}`}
+function buildRing(o){
+  ringEl.innerHTML='';ringPlace=o?o.name:'';
+  ringSel=Math.max(0,currentActions.findIndex(a=>a.ok));
+  currentActions.forEach((a,i)=>{
+    const b=document.createElement('button');b.className='rb'+(a.ok?'':' no')+(i===ringSel?' sel':'');
+    b.innerHTML=actIcon(a.label)+(i<4?`<span class="n">${i+1}</span>`:'');b.title=a.label;
+    b.onmouseenter=()=>{ringSel=i;[...ringEl.children].forEach((c,j)=>c.classList.toggle('sel',j===i));capEl.innerHTML=capText(i)};
+    b.onclick=e=>{e.stopPropagation();if(a.ok){Sfx.play('pick');doAction(a)}else{capEl.innerHTML=capText(i)}};
+    ringEl.appendChild(b);
+  });
+  capEl.innerHTML=currentActions.length?capText(ringSel):'';
+  placeRing(true);
+}
+function placeRing(force){
+  const n=ringEl.children.length;if(!n){capEl.innerHTML='';return}
+  const sx=cv.clientWidth/W,sy=cv.clientHeight/H,hx=S.p.x*sx,hy=cv.offsetTop+(S.p.y-4)*sy;
+  const bs=ringEl.children[0].offsetWidth||34,R=Math.max(bs*1.45,cv.clientWidth*.066),up=(S.p.y*sy)>R+44;
+  const step=2*Math.asin(Math.min(1,(bs+6)/(2*R)))*180/Math.PI,center=up?-90:90,spread=Math.min(210,step*(n-1));
+  ringEl.style.left=hx+'px';ringEl.style.top=hy+'px';
+  if(force||ringEl.dataset.up!==String(up)){ringEl.dataset.up=up;
+    [...ringEl.children].forEach((b,i)=>{const ang=(center-spread/2+(n>1?spread*i/(n-1):0))*Math.PI/180;b.style.left=Math.cos(ang)*R+'px';b.style.top=Math.sin(ang)*R+'px'})}
+  capEl.style.left=hx+'px';capEl.style.top=(up?hy-R-24:hy+R+48)+'px';capEl.style.transform=up?'translate(-50%,-100%)':'translate(-50%,0)';
+}
 function renderUI(){
   for(const [k] of STATS){const v=Math.max(0,S[k]);for(const x of ['','2']){document.getElementById('v_'+k+x).textContent=Math.round(v);document.getElementById('b_'+k+x).style.width=v+'%'}}
   clockEl.textContent=fmt(S.t);
@@ -449,18 +490,11 @@ function renderUI(){
   if(S.wet)items.push('💧 젖음');
   invEl.innerHTML=items.length?items.map(t=>`<span class="item">${t}</span>`).join(''):'<span style="color:var(--dim)">비어 있음</span>';
   const o=nearPOI();currentActions=actionsFor(o).concat(drinkActions());
+  if(I.can)currentActions.push({label:'통조림 먹기',cost:10,ok:true,fn:()=>{emote('♥');S.inv.can--;S.ateCan++;S.food=Math.min(100,S.food+30);log('칼로 통조림을 땄다. 정체 모를 콩 요리. 맛은 상관없다. (식량 +30)')}});
   const key=(o?(o.id+(o.find?o.find.id:'')):'')+'|'+currentActions.map(a=>a.label+a.ok).join(',')+'|'+I.can;
   if(key!==lastActKey||dirtyUI){
     lastActKey=key;dirtyUI=false;
-    actEl.innerHTML='';
-    const w=document.createElement('div');w.className='where';w.textContent=o?`▸ ${o.name}`:'';actEl.appendChild(w);
-    currentActions.forEach((a,i)=>{
-      const b=document.createElement('button');b.disabled=!a.ok;
-      b.innerHTML=`<span class="k">${i+1}</span>${a.label}`+(a.cost?` <span style="color:var(--dim);font-size:11px">${a.cost}분</span>`:'');
-      if(!a.ok&&a.why)b.innerHTML+=` <span style="color:var(--dim);font-size:11px">— ${a.why}</span>`;
-      b.onclick=()=>doAction(a);actEl.appendChild(b);
-    });
-    if(I.can){const b=document.createElement('button');b.innerHTML=iconImg('can',14)+' 통조림 먹기 <span style="color:var(--dim);font-size:11px">10분</span>';b.onclick=()=>{eatCan();dirtyUI=true};actEl.appendChild(b)}
+    buildRing(o);
   }
 }
 
@@ -544,6 +578,28 @@ const ICON={
 };
 const ICONURL={};for(const k in ICON)ICONURL[k]=dataURL(ICON[k]);
 const iconImg=(k,size)=>`<img src="${ICONURL[k]}" width="${size}" height="${size}" style="image-rendering:pixelated;vertical-align:middle" alt="">`;
+
+
+// --- action icons (10x10) for the ring around the hero ---
+const AICON_SRC={
+  look:[["..oooo....",".oggggo...","oggggggo..","oggggggo..","oggggggo..",".oggggo...","..ooooh...","......hh..",".......hh.","........hh"],{o:'#e8e0cc',g:'#9cc4d8',h:'#8a6a46'}],
+  hand:[["....o.....","...obo....","...obo....","..obbbo...","..oblbbo..",".obllbbo..",".obbbbbo..",".obbbbbo..","..obbbo...","...ooo...."],{o:'#1e3a5a',b:'#4a90d0',l:'#9fd0f0'}],
+  fire:[["....r.....","...rr.....","...rro....","..rroor...","..roooor..",".rrooyor..",".rooyyoor.",".rooyyyor.","..royyor..","...rrrr..."],{r:'#c8361e',o:'#f08a2a',y:'#f8d050'}],
+  pot:[["..s..s....","...s..s...","..s..s....","dmmmmmmmd.",".dwwwwwd..",".dmmmmmd..",".dmmmmmd..",".dmmmmmd..","..ddddd...",".........."],{m:'#8a8a86',d:'#4a4a46',s:'#d8e4ec',w:'#4f82a4'}],
+  cup:[["..........",".cccccc...",".cwwwwccc.",".cwwwwc.c.",".cwwwwc.c.",".cwwwwccc.",".cwwwwc...",".dccccd...","..dddd....",".........."],{c:'#e8e0cc',d:'#8a8476',w:'#4f82a4'}],
+  hammer:[["..hhhhh...",".hhhhhhH..","..HHwHH...","....w.....","....w.....","....w.....","....w.....","....w.....","....w.....",".........."],{h:'#b0b0aa',H:'#5e5e5a',w:'#8a6a46'}],
+  moon:[["...yyy....","..yyY.....",".yyY......",".yyY......",".yyY......",".yyY......",".yyY......","..yyY.....","...yyy....",".........."],{y:'#f0dc90',Y:'#c8b060'}],
+  zz:[["......zzzz",".........z","........z.",".zzzz.zzzz","....z.....","...z......","..z.......",".zzzz.....","..........",".........."],{z:'#9ab0e0'}],
+  shirt:[[".ss..ss...","ssssssss..","sSssssSs..","..ssss....","..ssss..d.","..ssss.ddd","..SSSS.ddd","........d.","..........",".........."],{s:'#8a9ab0',S:'#5a6a80',d:'#4a90d0'}],
+  radio:[["........n.",".......n..","......n...","bbbbbbbbb.","bggbaaaab.","bggbaaaab.","bggbbgbgb.","bbbbbbbbb.","..........",".........."],{b:'#3b3a36',g:'#9a968a',a:'#cdb88c',n:'#a8a8a2'}],
+  car:[["..........","...rrrr...","..rwwwwr..",".rrrrrrrr.","rrRrrrrRrr","rrrrrrrrrr",".tt....tt.",".tt....tt.","..........",".........."],{r:'#a35f38',R:'#6a3520',w:'#8fb0b8',t:'#1e1a17'}],
+  berry:[["....gg....","...gg.....","..rr.rr...",".rhrrhrr..",".rrrrrrr..","..rhrrr...","..rrrr....","...rr.....","..........",".........."],{r:'#c03040',h:'#f07080',g:'#417336'}],
+  rock:[["..........","...kkkk...","..klllkk..",".kllkkkkk.",".kkkkkkKk.","KkkkkkKKK.",".KKKKKKK..","..........","..........",".........."],{k:'#86837a',K:'#5e5c56',l:'#a8a59a'}],
+};
+const AICONURL={};for(const k in AICON_SRC)AICONURL[k]=dataURL(sprite(AICON_SRC[k][0],AICON_SRC[k][1]));
+const ACT_ICON=[['살펴보기','look'],['담요 꺼내기','blanket'],['트렁크','car'],['운전석','car'],['빗물 병에','bottle'],['들여다','look'],['덤불','berry'],['바위','rock'],['가지','wood'],['병에 강물','bottle'],['걸러','cloth'],['그냥 마시기','hand'],['불 피우기','fire'],['끓이기','pot'],['구워','cray'],['함석판 뜯','metal'],['풀 베기','grass'],['지붕','hammer'],['풀 깔기','grass'],['입구에 담요','blanket'],['땔감 안에','wood'],['옷','shirt'],['라디오','radio'],['잠들기','moon'],['기다리기','zz'],['마시기','cup'],['통조림','can']];
+function actIcon(label){const m=ACT_ICON.find(([k])=>label.includes(k));const k=m?m[1]:'look';
+  return AICONURL[k]?`<img src="${AICONURL[k]}" alt="">`:`<img class="s7" src="${ICONURL[k]}" alt="">`}
 
 // --- emotion bubbles above the hero ---
 const EMO_SYM={
@@ -861,6 +917,7 @@ function frame(now){
     if(S.running)renderUI();
   }
   draw(now);
+  if(S&&S.running)placeRing(false);else if(ringEl.children.length&&!ov.classList.contains('hide')){ringEl.innerHTML='';capEl.innerHTML='';lastActKey=''}
   requestAnimationFrame(frame);
 }
 
@@ -1000,7 +1057,7 @@ const Music=(()=>{
   return{start,setOn,musicBox,thunder,sfx,get on(){return on}};
 })();
 const Sfx={play:(n,a)=>Music.sfx(n,a)};
-const SND=[['함석','metal'],['지붕','metal'],['풀','rustle'],['덤불','rustle'],['가지','rustle'],['구워','eat'],['담요','cloth'],['옷','cloth'],['마시기','drink'],['걸러','water'],['담기','water'],['들여다','water'],['불 피우기','fire'],['끓이','boil'],['라디오','radio'],['바위','rock'],['트렁크','car'],['운전석','car'],['땔감','wood'],['살펴보기','find']];
+const SND=[['통조림','eat'],['함석','metal'],['지붕','metal'],['풀','rustle'],['덤불','rustle'],['가지','rustle'],['구워','eat'],['담요','cloth'],['옷','cloth'],['마시기','drink'],['걸러','water'],['담기','water'],['들여다','water'],['불 피우기','fire'],['끓이','boil'],['라디오','radio'],['바위','rock'],['트렁크','car'],['운전석','car'],['땔감','wood'],['살펴보기','find']];
 const muteBtn=document.getElementById('mute');
 muteBtn.onclick=()=>{Music.start();Music.setOn(!Music.on);muteBtn.textContent=Music.on?'♪ ON':'♪ OFF';muteBtn.blur()};
 
@@ -1011,7 +1068,7 @@ const DAYS={
      intro:()=>`<h2>마지막 사람</h2><div class="sub">멸망 후 50년 · 1일차 — 물이 탁해졌다</div>
   <p>마지막으로 사람 목소리를 들은 게 언제였는지 기억나지 않는다. 도시는 숲이 되었고, 나는 강가의 작은 쉼터에서 하루하루를 지낸다.</p>
   <p>어젯밤 비가 그친 뒤로 강물이 흙빛이다. 마실 물을 구해야 한다.<br>그리고 오늘은, 조금 멀리까지 걸어 볼 생각이다.</p>
-  <p class="small">✦ 반짝이는 곳에는 50년 전의 물건이 있습니다. 가져가서 쉼터에 둘 수도, 그 자리에 둘 수도 있어요.<br>자동차, 빗물통, 덤불, 바위처럼 주변 사물에 다가가면 만져 볼 수 있어요.<br>물을 얻는 방법은 하나가 아닙니다. 위쪽 💭 혼잣말이 넌지시 알려 줍니다.<br>어둡게 가려진 곳은 아직 가 보지 않은 곳입니다. 걸어가면 밝혀져요.<br>이동: WASD·방향키 또는 화면 탭 · 행동: Space·숫자키 또는 오른쪽 아래 버튼 · ⏸ 일시정지(P) · ☰ 날짜 선택<br>하루는 저절로 끝나지 않아요. 쉼터 잠자리에서 잠들 때 끝납니다.</p>`},
+  <p class="small">✦ 반짝이는 곳에는 50년 전의 물건이 있습니다. 가져가서 쉼터에 둘 수도, 그 자리에 둘 수도 있어요.<br>자동차, 빗물통, 덤불, 바위처럼 주변 사물에 다가가면 만져 볼 수 있어요.<br>물을 얻는 방법은 하나가 아닙니다. 위쪽 💭 혼잣말이 넌지시 알려 줍니다.<br>어둡게 가려진 곳은 아직 가 보지 않은 곳입니다. 걸어가면 밝혀져요.<br>이동: WASD·방향키 또는 화면 탭 · 행동: 주인공 주변에 뜨는 아이콘을 누르거나 Space·숫자키 · ⏸ 일시정지(P) · ☰ 날짜 선택<br>하루는 저절로 끝나지 않아요. 쉼터 잠자리에서 잠들 때 끝납니다.</p>`},
   2:{theme:'폭풍이 온다',wake:'눈을 떴다. 바람 소리가 심상치 않다.',
      intro:()=>`<h2>2일차</h2><div class="sub">폭풍이 온다</div>
   <p>아침부터 바람 냄새가 다르다. 하늘 한쪽이 무겁게 내려앉았다.<br>오후 세 시쯤이면 폭풍이 들이닥칠 것이다.</p>
