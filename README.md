@@ -2,6 +2,13 @@
 
 멸망 후 50년, 혼자 남은 사람이 하루에 한 가지 생존 기술을 익히는 2D 도트 게임.
 
+## ▶ 바로 플레이하기
+**https://iamyooon.github.io/game_lastsurvivor/**
+
+설치나 다운로드 없이 브라우저에서 바로 플레이할 수 있어요. PC와 휴대폰 모두 지원합니다.
+- PC: WASD·방향키로 이동, Space·숫자키로 행동, P로 일시정지
+- 휴대폰: 화면을 눌러 이동, 주인공 주변에 뜨는 아이콘을 눌러 행동
+
 - `index.html` 한 파일로 동작 (그래픽·음악·효과음 모두 코드로 생성)
 - 배포: claude.ai 아티팩트 "마지막 사람 — 프로토타입"
 - 저장소: https://github.com/iamyooon/game_lastsurvivor
