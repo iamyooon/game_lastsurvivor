@@ -1540,6 +1540,78 @@ DAY_HOOKS.draw.push(now=>{
   // clothesline from the shelter wall
   if(K.line){for(let i=0;i<22;i++)P(lc,232+i,112+Math.round(Math.sin(i/21*Math.PI)*2),'#b8945a');P(lc,238,113,'#7a8aa0',4,5);P(lc,245,114,'#a04040',3,4)}
 });
+// ===== DAY 9 · 짐을 꾸리다 (장거리 이동 준비) =====
+addIcons({
+  pack:[['..ppp..','.pPPPp.','pPkkkPp','pPPPPPp','pPkkkPp','pPPPPPp','.ppppp.'],{p:'#4a3d30',P:'#6a5642',k:'#33291f'}],
+  note:[['.......','.wwwww.','.wkkkw.','.wwwww.','.wkkww.','.wwwww.','.......'],{w:'#f0ece0',k:'#5a5a6a'}],
+});
+ON_START[9]=()=>{S.dandLeft=3;S.wormLeft=3;S.mushLeft=0;S.packed=false;S.pack=[]};
+PRESET[9]=()=>{const I=S.inv;I.cord=1;S.cordMade=4;S.knots={hang:true,line:true,join:true};S.d8radio=true;S.notes.push(8);S.found.knotcard='placed';S.placedOrder.push('knotcard')};
+
+const eul=w=>w+(((w.charCodeAt(w.length-1)-44032)%28)?'을':'를'); // 을/를 by the last syllable
+const foodCount=()=>{const I=S.inv;return (I.dfish||0)+(I.dand||0)+(I.can||0)+(I.fish||0)};
+const PACK_CAP=10;
+function packCandidates(){
+  const I=S.inv,fc=foodCount(),C=[];
+  if(I.bottle)C.push({id:'water',name:'물병',sub:I.bw?'물이 차 있다':'비어 있다',w:2,cat:'물'});
+  if(I.flint&&I.steel)C.push({id:'fire',name:'불 피우기 도구',sub:S.kitWrapped?'헝겊에 싸 둠':'부싯돌·쇳조각·불쏘시개',w:1,cat:'불'});
+  if(S.prep.door||I.blanket)C.push({id:'blanket',name:'담요',sub:'입구에서 떼어 감',w:2,cat:'체온'});
+  if(fc)C.push({id:'food',name:'식량',sub:`${fc}개`,w:Math.max(1,Math.ceil(fc/2)),cat:'식량'});
+  if(I.cloth||I.bandage)C.push({id:'aid',name:'헝겊·붕대',sub:'응급처치',w:1,cat:'응급'});
+  if((I.cord||0)>0||S.cordMade)C.push({id:'cord',name:'끈',sub:'묶고 잇고 매달기',w:1,cat:'도구'});
+  if(I.rod)C.push({id:'rod',name:'낚싯대',sub:'가는 길에 먹을 것',w:2,cat:'도구'});
+  if(I.mirror||S.mirrorDone)C.push({id:'mirror',name:'사이드미러',sub:'낮의 신호',w:1,cat:'신호'});
+  C.push({id:'radio',name:'라디오',sub:'무겁다',w:4,cat:'신호'});
+  S.placedOrder.forEach(id=>{const f=FINDS.find(x=>x.id===id);if(f&&f.kind==='mem')C.push({id:'mem_'+id,name:f.name,sub:'기억',w:id==='musicbox'||id==='umbrella'?2:1,cat:'기억',icon:id})});
+  return C;
+}
+const PACK_ICON={water:'bottle',fire:'flint',blanket:'blanket',food:'dfish',aid:'bandage',cord:'cord',rod:'rod',mirror:'mirror',radio:null};
+function packCard(){
+  S.running=false;const C=packCandidates(),sel=new Set(S.pack||[]);
+  const render=()=>{
+    const w=C.filter(c=>sel.has(c.id)).reduce((t,c)=>t+c.w,0);
+    card.innerHTML=`<div class="icon">${iconImg('pack',54)}</div><h2>배낭 꾸리기</h2><div class="sub">무게 ${w} / ${PACK_CAP} · 들 수 있는 만큼만</div>
+    <div class="bar" style="height:10px;margin-bottom:10px"><i style="width:${Math.min(100,w/PACK_CAP*100)}%;background:${w>PACK_CAP?'#d9604c':'#e8a84c'}"></i></div>
+    <div class="daylist" id="pk">${C.map(c=>{const ic=c.icon||PACK_ICON[c.id];const on=sel.has(c.id);return `<button data-id="${c.id}" class="${on?'':'ghost'}" style="${on?'':'opacity:.75'}"><span>${ic?iconImg(ic,16):'📻'} <b>${c.name}</b> <span class="sk">${c.sub}</span></span><span class="sk">${c.cat} · ${c.w}${on?' ✓':''}</span></button>`}).join('')}</div>
+    <div class="btns"><button id="pkOk" ${w>PACK_CAP?'disabled':''}>이대로 꾸린다</button><button id="pkCancel" class="ghost">나중에</button></div>
+    <p class="small" id="pkMsg">${w>PACK_CAP?'너무 무겁다. 뭔가 빼야 한다.':'무엇을 먼저 챙길지 생각해 보자. 남은 것은 쉼터에 두고 간다.'}</p>`;
+    card.querySelectorAll('#pk button').forEach(b=>b.onclick=()=>{Sfx.play('pick');sel.has(b.dataset.id)?sel.delete(b.dataset.id):sel.add(b.dataset.id);render()});
+    document.getElementById('pkCancel').onclick=()=>{ov.classList.add('hide');S.running=true;dirtyUI=true};
+    document.getElementById('pkOk').onclick=()=>{
+      S.pack=[...sel];S.packed=true;ov.classList.add('hide');S.running=true;dirtyUI=true;Sfx.play('place');
+      const miss=['blanket','water','fire','food','aid'].filter(id=>C.find(c=>c.id===id)&&!sel.has(id));
+      const mem=S.pack.filter(x=>x.startsWith('mem_')).length;
+      emote(miss.length?'?':'♥');
+      log(miss.length?`배낭을 꾸렸다. 그런데 ${eul(miss.map(m=>({blanket:'담요',water:'물병',fire:'불 피우기 도구',food:'식량',aid:'헝겊·붕대'})[m]).join(', '))} 두고 가도 괜찮을까.`:`배낭을 꾸렸다. 체온, 물, 불, 먹을 것, 응급. 빠진 건 없다.${mem?` 기억 ${mem}개도 함께.`:''}`);
+    };
+  };
+  render();ov.classList.remove('hide');
+}
+DAY_HOOKS.actions.push((o,a)=>{
+  if(!o||S.day!==9)return;const I=S.inv;
+  if(o.id==='bed')a.unshift({label:S.packed?'배낭 다시 꾸리기':'배낭 꾸리기',cost:20,ok:true,fn:()=>setTimeout(packCard,30)});
+  if(o.id==='shelter'){
+    if(I.flint&&I.steel&&!S.kitWrapped)a.push({label:'불 피우기 도구 헝겊에 싸기',cost:10,ok:!!I.cloth,why:'쌀 헝겊이 없다',fn:()=>{S.kitWrapped=true;log('부싯돌과 쇳조각, 자작나무 껍질을 헝겊으로 단단히 싸서 끈으로 묶었다. 비가 와도 불은 피울 수 있다.')}});
+    if(!S.noteLeft)a.push({label:'문에 쪽지 남기기',cost:15,ok:true,fn:()=>{S.noteLeft=true;emote('…');log('숯으로 판자에 적었다. 「11월, 강을 따라 하구 선착장으로 감. 수아.」 누군가 찾아온다면 길이 될 것이다.')}});
+  }
+  if(o.id==='radio'&&S.t>=19*60&&!S.d9radio){a.length=0;a.push({label:'라디오 켜기 (약속한 시간)',cost:20,ok:true,fn:()=>{S.d9radio=true;emote('note',3000);log('「…내일 떠나신다고요. 산 쪽 옛 터널이 무너지면서 동굴이 열렸다는 보고가 있습니다. 강을 돌아가는 것보다 빠를 수 있지만, 조심하세요.」')}})}
+});
+MONO[9]=()=>{
+  const I=S.inv,fc=foodCount(),water=I.bw==='boiled'||I.bw==='rain';let s;
+  if(S.t>=19*60&&!S.d9radio)s='저녁 일곱 시다. 라디오로 내일 떠난다고 알리자.';
+  else if(!water)s='먼 길이다. 병에 마실 수 있는 물부터 채우자. 끓이거나, 빗물로.';
+  else if(fc<2)s='가는 길에 먹을 것이 필요하다. 생선을 말리거나, 민들레를 캐 두자. 최소 두 끼.';
+  else if(!S.kitWrapped&&I.flint&&I.steel)s='불 피우기 도구가 젖으면 끝이다. 쉼터에서 헝겊에 싸 두자.';
+  else if(!S.noteLeft)s='떠나기 전에 문에 쪽지를 남기자. 어디로, 언제 가는지.';
+  else if(!S.packed)s='이제 잠자리 옆에서 배낭을 꾸리자. 다 가져갈 수는 없다.';
+  else s='준비는 끝났다. 쉼터에서의 마지막 밤이다.';
+  return {s,count:`준비 — 물 ${ck(water)} · 식량 ${fc}/2 · 불씨 방수 ${ck(S.kitWrapped)} · 쪽지 ${ck(S.noteLeft)} · 배낭 ${ck(S.packed)}`};
+};
+DAY_HOOKS.draw.push(now=>{
+  if(S.day!==9)return;
+  if(S.noteLeft){P(lc,206,126,'#f0ece0',5,4);P(lc,207,127,'#5a5a6a',3,1);P(lc,207,129,'#5a5a6a',2,1)}
+  if(S.packed){P(lc,226,112,'#4a3d30',6,7);P(lc,227,113,'#6a5642',4,2);P(lc,227,116,'#33291f',4,1)}
+});
 // @@DAY_WORLD@@
 // ---------- loop ----------
 let last=performance.now();
@@ -1954,6 +2026,27 @@ JOURNAL[8]=(forced,home)=>{
   L.push(S.d8radio?'저녁 일곱 시, 라디오. 선착장까지 강을 따라 사흘 거리.':'라디오 시간을 놓쳤다. 내일은 꼭.');
   return L;
 };
+DAYS[9]={theme:'짐을 꾸리다',wake:'눈을 떴다. 쉼터 천장의 틈을 오래 올려다봤다.',
+  intro:()=>`<h2>9일차</h2><div class="sub">짐을 꾸리다</div>
+  <p>내일이면 떠난다. 선착장까지 강을 따라 사흘. 쉼터를 떠나 그렇게 멀리 가 본 적이 없다.</p>
+  <p>오늘은 <b>먼 길을 떠나기 전에 무엇을 준비하고, 무엇을 먼저 챙기는지</b> 익힌다. 배낭에는 다 들어가지 않는다.</p>
+  <p class="small">물, 먹을 것, 젖지 않는 불씨, 그리고 떠난다는 표시.<br>마지막엔 잠자리 옆에서 배낭을 꾸려요. 무게 10까지 넣을 수 있어요.<br>쉼터에 둔 기억 물건 중 무엇을 가져갈지도 직접 고릅니다.</p>`};
+NOTES[9]={title:'장거리 이동 준비',body:['짐의 우선순위: 체온(옷·담요) → 물 → 불 → 먹을 것 → 응급처치 → 신호·도구. 남는 자리에 소중한 것.','배낭은 몸무게의 5분의 1에서 4분의 1을 넘지 않게. 무거운 것은 등 가까이, 자주 쓰는 것은 꺼내기 쉬운 곳에.','사람은 하루에 물 2리터 이상이 필요하다. 다 들 수 없다면 물을 구할 수 있는 길(강을 따라)을 고른다.','불 피우는 도구와 불쏘시개는 젖지 않게 싸서 다닌다.','떠나기 전 행선지와 날짜를 적은 쪽지를 남긴다. 누군가 찾으러 오면 그게 길이 된다.'],
+  did:()=>{const C=S.pack||[];return [S.kitWrapped?'불씨 방수 포장':null,S.noteLeft?'쪽지 남기기':null,S.packed?`배낭 꾸리기 (${C.length}가지)`:null].filter(Boolean).join(' · ')||'아직 못 해 봄'}};
+JOURNAL[9]=(forced,home)=>{
+  const P2=S.pack||[],L=['9일차.'];
+  if(S.packed){
+    const nm={water:'물병',fire:'불 피우기 도구',blanket:'담요',food:'식량',aid:'헝겊과 붕대',cord:'끈',rod:'낚싯대',mirror:'사이드미러',radio:'라디오'};
+    const gear=P2.filter(x=>!x.startsWith('mem_')).map(x=>nm[x]).filter(Boolean),mem=P2.filter(x=>x.startsWith('mem_')).map(x=>FINDS.find(f=>f.id===x.slice(4))).filter(Boolean);
+    L.push(`배낭에 ${eul(gear.join(', '))} 넣었다.`);
+    L.push(mem.length?`그리고 ${mem.map(f=>f.name).join(', ')}. 무게보다 이게 더 필요할 것 같았다.`:'기억 물건은 모두 쉼터에 두고 가기로 했다. 돌아올 이유로 남겨 둔다.');
+    if(!P2.includes('radio'))L.push('라디오는 너무 무거워서 두고 간다. 내일부터는 대피소 목소리를 못 듣는다.');
+  }else L.push('배낭을 꾸리지 못했다. 무엇을 두고 가야 할지 정하지 못했다.');
+  if(S.noteLeft)L.push('문에 쪽지를 남겼다. 「강을 따라 하구 선착장으로 감. 수아.」 내 이름을 처음으로 적어 봤다.');
+  if(S.d9radio)L.push('대피소에서 무너진 산에 동굴이 열렸다고 했다. 지름길일지도, 함정일지도.');
+  L.push('쉼터에서의 마지막 밤.');
+  return L;
+};
 // @@DAY_SCREENS@@
 const WEEK=[
   {d:1,theme:'물이 탁해졌다',skill:'식수 만들기',ready:true},
@@ -1964,7 +2057,7 @@ const WEEK=[
   {d:6,theme:'북쪽은 어디일까',skill:'방향 찾기',ready:true},
   {d:7,theme:'누군가에게',skill:'구조 신호 보내기',ready:true},
   {d:8,theme:'끈이 필요하다',skill:'끈과 매듭',w:2,ready:true},
-  {d:9,theme:'짐을 꾸리다',skill:'장거리 이동 준비',w:2},
+  {d:9,theme:'짐을 꾸리다',skill:'장거리 이동 준비',w:2,ready:true},
   {d:10,theme:'산이 무너졌다',skill:'동굴 안전',w:2},
   {d:11,theme:'하늘을 읽다',skill:'날씨 예측',w:2},
   {d:12,theme:'배를 엮다',skill:'뗏목·배 수리',w:2},
