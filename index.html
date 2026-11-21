@@ -1908,7 +1908,7 @@ const DOCK={x:540,y:440};
       {id:'v_lean',x:200,y:240,r:22,name:'바위 아래 비 피할 자리',when:()=>!S.crossed},
       {id:'v_drift',x:488,y:165,r:24,name:'떠밀려 온 나무 더미',when:()=>!S.crossed},
       {id:'v_moss',x:380,y:150,r:22,name:'이끼 낀 바위',when:()=>!S.crossed},
-      {id:'v_wreck',x:462,y:236,r:24,name:'뒤집힌 나룻배',when:()=>!S.crossed},
+      {id:'v_wreck',x:462,y:236,r:24,name:'뒤집힌 나룻배',when:()=>!S.crossed&&S.day<=12},
       {id:'v_birds',x:330,y:330,r:28,name:'풀밭',only:[11]},
       {id:'v_fA',x:FORDS.A.x,y:FORDS.A.y,r:22,name:'좁은 여울',only:[13],when:()=>!S.crossed},
       {id:'v_fB',x:FORDS.B.x,y:FORDS.B.y,r:22,name:'넓은 여울',only:[13],when:()=>!S.crossed},
@@ -2061,6 +2061,66 @@ MONO[12]=()=>{
   else if(!S.paddle)s=(I.plank>0)?'판자가 있다. 야영지에서 끈으로 묶어 노를 만들자.':'배가 뜬다! 이제 노가 필요하다. 떠밀려 온 나무 더미를 뒤져 보자.';
   else s='수아호가 준비됐다. 내일 강을 건넌다. 오늘은 쉬자.';
   return {s,count:`나룻배 — 살핌 ${ck(S.boatSeen)} · 구멍 ${3-open}/3 · 띄움 ${ck(S.boatReady)} · 노 ${ck(S.paddle)}`};
+};
+// ===== DAY 13 · 물을 건너다 (강 건너기) =====
+ON_START[13]=()=>{if(S.map!=='valley')goValley(172,278);else{S.p={x:172,y:278,face:1,step:0};CAM.snap=true}S.rainLv=0;S.clouds=2;S.crossed=false;S.fordSeen={};S.lashed=false;S.dryBag=false;S.boatSecured=false;S.boatPos={x:490,y:250};S.boatUp=true;S.lostItems=[]};
+PRESET[13]=()=>{S.notes.push(12);S.boatReady=true;S.paddle=true;S.inv.paddle=1;S.holes=[1,1,1];S.boatUp=true;S.found.boatname='taken';S.inv.cord=Math.max(S.inv.cord||0,1)};
+MAPS.valley.pois.push({id:'v_boat',get x(){return (S.boatPos||{x:490}).x-4},get y(){return (S.boatPos||{y:250}).y-6},r:28,name:'수아호',only:[13,14]});
+const FORD_INFO={A:'막대가 순식간에 휙 떠내려간다. 폭은 좁지만 물살이 거세고 흰 물결이 바위에 부서진다.',B:'막대가 천천히, 곧게 흘러간다. 폭은 넓지만 물결이 잔잔하고 바닥 자갈이 비친다.',C:'막대가 빙글빙글 맴돌다 빨려 들어간다. 소용돌이다. 물빛이 검다— 깊다.'};
+function crossRiver(k){
+  const qs=[
+    {t:'배에 오를 때와 앉을 때',p:'수아호는 작고 가볍다. 어떻게 탈까?',o:[{t:'일어서서 균형을 잡는다',d:'멀리 보면서 노를 젓기 좋다'},{t:'몸을 낮추고 배 한가운데에 앉는다',d:'무게중심을 낮게, 가운데로'},{t:'짐과 함께 한쪽 가장자리에 앉는다',d:'내리기 쉽게 기슭 쪽으로'}],ok:1},
+    {t:'노 젓는 방향',p:'강물은 북에서 남으로 흐른다. 건너편으로 어떻게 저을까?',o:[{t:'건너편을 향해 똑바로 젓는다',d:'가장 짧은 거리'},{t:'뱃머리를 약간 상류 쪽으로 비스듬히 두고 젓는다',d:'물살에 밀리는 만큼 거슬러'},{t:'물살을 타고 하류로 내려가며 젓는다',d:'힘이 덜 든다'}],ok:1},
+  ];
+  let wrong=0;
+  const step=i=>{if(i>=qs.length)return finish();const q=qs[i];
+    choiceCard(q.t,`${FORDS[k].name}에서 건너기 · ${i+1}/2`,q.p,q.o,pick=>{if(pick!==q.ok)wrong++;step(i+1)},'paddle')};
+  const loseSome=n=>{const pool=['dfish','dand','can','bandage','charcoal','moss','resin'].filter(x=>S.inv[x]>0);const lost=[];for(let j=0;j<n&&pool.length;j++){const x=pool.splice(Math.random()*pool.length|0,1)[0];S.inv[x]=0;lost.push(x)}if(S.inv.bottle&&n>1&&!lost.length){S.inv.bottle=false;S.inv.bw=null;lost.push('bottle')}S.lostItems=lost;return lost};
+  const finish=()=>{
+    let msg,ok=false;S.t+=40;
+    if(k==='A'){msg='물살이 배 옆구리를 때렸다. 뱃머리가 확 돌아가더니— 뒤집혔다! 차가운 물속에서 배를 붙잡고 겨우 건너편 자갈에 기어올랐다.';S.capsized=true}
+    else if(k==='C'){msg='굽이에서 소용돌이가 배를 빙글빙글 돌렸다. 한참을 떠밀리다 겨우 빠져나왔다. 물을 뒤집어쓰고, 한참 아래쪽에 닿았다.';S.spun=true;S.t+=40}
+    else if(wrong===0){msg='몸을 낮추고, 뱃머리를 상류로 살짝 틀어 저었다. 물살이 배를 밀어도 곧장 건너편으로 미끄러져 간다. 자갈이 배 바닥을 긁는 소리. 건넜다!';ok=true}
+    else{msg=wrong>1?'배가 크게 흔들리고 물살에 한참 밀렸다. 뱃전으로 물이 넘쳐 들어와 온몸이 젖었다. 그래도 넓고 잔잔한 곳이라 겨우 건넜다.':'배가 한 번 크게 기우뚱했다. 물이 튀어 옷이 젖었다. 그래도 넓고 잔잔한 곳이라 무사히 건넜다.';S.wobbled=true}
+    if(!ok){S.wet=true;S.wasWet=true;S.warm=Math.max(10,S.warm-(S.capsized?30:15));S.hp-=S.capsized?15:S.spun?6:3;S.mind=Math.max(0,S.mind-(S.capsized?10:4))}
+    let lost=[];if((S.capsized||S.spun)&&!S.lashed)lost=loseSome(S.capsized?2:1);
+    if(lost.length)msg+=`\n\n묶어 두지 않은 짐이 물에 쓸려 갔다: ${lost.map(x=>({dfish:'말린 생선',dand:'민들레',can:'통조림',bandage:'붕대',charcoal:'숯',moss:'이끼',resin:'송진',bottle:'물병'})[x]).join(', ')}`;
+    else if((S.capsized||S.spun)&&S.lashed)msg+='\n\n배에 단단히 묶어 둔 짐은 무사하다.';
+    if(S.wet&&S.dryBag)msg+='\n담요에 싸 둔 마른 옷이 있다. 갈아입자.';
+    const y=FORDS[k].ey,x=RV.cx(y)+RV.hw(y)+16;
+    S.crossed=true;S.crossFord=k;S.boatPos={x:x+8,y:y+12};S.p={x:x+4,y,face:1,step:0};S.target=null;CAM.snap=true;
+    choiceCard(ok?'건넜다':'겨우 건넜다','동쪽 기슭',msg.replace(/\n/g,'<br>'),[{t:'계속'}],()=>{emote(ok?'♥':'drop');log(ok?'동쪽 기슭에 닿았다.':'동쪽 기슭이다. 몸이 덜덜 떨린다.')},'paddle');
+  };
+  step(0);
+}
+DAY_HOOKS.actions.push((o,a)=>{
+  if(!o||S.day!==13)return;const I=S.inv;
+  if(o.id&&o.id.startsWith('v_f')){const k=o.id[3];
+    a.push({label:'막대 던져 물살 보기',cost:10,ok:true,fn:()=>{S.fordSeen[k]=1;Sfx.play('water');log(FORD_INFO[k])}});
+    a.push({label:'여기서 배 띄워 건너기',cost:20,ok:S.boatReady&&S.paddle,why:!S.boatReady?'배가 아직 물에 뜨지 않는다':'노가 없다',fn:()=>crossRiver(k)});
+  }
+  if(o.id==='v_boat'&&!S.crossed){
+    if(!S.lashed)a.push({label:'짐을 배에 단단히 묶기 (끈)',cost:15,ok:(I.cord||0)>=1,why:'묶을 끈이 없다',fn:()=>{I.cord--;S.lashed=true;log('배낭을 배의 가로대에 끈으로 단단히 묶었다. 배가 뒤집혀도 짐은 떠내려가지 않는다.')}});
+    if(!S.dryBag)a.push({label:'마른 옷을 담요에 싸 두기',cost:10,ok:!!I.blanket,why:'쌀 만한 천이 없다',fn:()=>{S.dryBag=true;log('갈아입을 옷을 담요로 꽁꽁 싸서 배낭 맨 안쪽에 넣었다. 젖으면 바로 갈아입을 수 있게.')}});
+  }
+  if(o.id==='v_boat'&&S.crossed&&!S.boatSecured)a.push({label:'배를 높이 끌어올려 묶어 두기',cost:20,ok:true,fn:()=>{S.boatSecured=true;S.boatPos={x:S.boatPos.x+14,y:S.boatPos.y};Sfx.play('wood');log('배를 물가에서 멀리 끌어올리고 나무에 묶었다. 밤사이 물이 불어도 떠내려가지 않게.')}});
+});
+DAY_HOOKS.global.push(a=>{
+  if(!S||S.day!==13||!S.wet||!S.dryBag)return;
+  a.push({bag:'blanket',label:'담요에 싸 둔 마른 옷으로 갈아입기',cost:15,ok:true,fn:()=>{S.wet=false;S.dryBag=false;S.warm=clamp100(S.warm+10);log('젖은 옷을 벗고 담요에 싸 둔 마른 옷으로 갈아입었다. 살 것 같다.')}});
+});
+MONO[13]=()=>{
+  const n=Object.keys(S.fordSeen||{}).length;let s;
+  if(S.crossed){
+    if(S.wet)s=S.dryBag?'젖었다! 가방의 담요에서 마른 옷을 꺼내 갈아입자.':'젖었다. 동쪽 솔숲에서 나무를 모아 불을 피우고 옷을 말리자.';
+    else if(!S.boatSecured)s='배를 물가에서 끌어올려 묶어 두자. 밤에 물이 불 수 있다.';
+    else if(!S.fire)s='동쪽 기슭이다. 불을 피우고 몸을 녹이자.';
+    else s='강을 건넜다. 야영지에서 쉬자. 내일은 선착장.';
+  }
+  else if(n<3)s='건널 곳은 세 군데. 좁은 여울, 넓은 여울, 굽이. 막대를 던져 물살부터 보자.';
+  else if(!S.lashed||!S.dryBag)s='어디서 건널지 정했다면, 짐을 배에 묶고 마른 옷을 싸 두자.';
+  else s='넓고 잔잔한 곳으로. 몸은 낮게, 뱃머리는 상류 쪽으로.';
+  return {s,count:`강 건너기 — 물살 확인 ${n}/3 · 짐 묶기 ${ck(S.lashed)} · 마른 옷 ${ck(S.dryBag)} · 건넘 ${ck(S.crossed)}`};
 };
 // @@DAY_WORLD@@
 // ---------- loop ----------
@@ -2542,6 +2602,22 @@ JOURNAL[12]=()=>{
   L.push(S.paddle?'판자를 묶어 노도 하나 만들었다. 내일, 강을 건넌다.':'노가 없다. 맨손으로 저을 수는 없다.');
   return L;
 };
+DAYS[13]={theme:'물을 건너다',wake:'강물이 조금 줄었다. 수아호가 물가에서 기다린다.',
+  intro:()=>`<h2>13일차</h2><div class="sub">물을 건너다</div>
+  <p>밤사이 강물이 조금 줄었다. 고친 배와 노가 있다. 이제 건너야 한다.</p>
+  <p>오늘은 <b>물을 안전하게 건너는 법</b>을 익힌다. 어디서, 어떻게 건널지 고르는 것이 반이다.</p>
+  <p class="small">건널 수 있는 곳이 세 군데 있어요. 직접 물살을 살펴보고 고르세요.<br>건너기 전에 짐과 옷을 챙겨 두면 만일의 일에 대비할 수 있습니다.</p>`};
+NOTES[13]={title:'물 건너기',body:['좁은 곳은 물살이 빠르고, 넓은 곳은 느리다. 넓고 잔잔하며 바닥이 보이는 곳을 고른다.','검고 소용돌이치는 굽이는 깊다. 피한다.','작은 배에서는 절대 일어서지 않는다. 몸을 낮추고 가운데에 앉는다.','물살을 거스르려면 뱃머리를 상류 쪽으로 비스듬히 두고 젓는다.','짐은 배에 묶고, 마른 옷은 따로 싸 둔다. 젖으면 바로 갈아입거나 불에 말린다.'],
+  did:()=>[Object.keys(S.fordSeen||{}).length?'물살 살피기':null,S.lashed?'짐 묶기':null,S.dryBag?'마른 옷 챙기기':null,S.crossed&&S.crossFord==='B'?'안전한 곳에서 건너기':S.crossed?'건너기':null,S.boatSecured?'배 끌어올리기':null].filter(Boolean).join(' · ')||'아직 못 해 봄'};
+JOURNAL[13]=()=>{
+  const L=['13일차.'];
+  if(!S.crossed){L.push('강을 건너지 못했다. 서쪽 기슭에서 하룻밤 더.');return L}
+  L.push(S.crossFord==='B'?(S.wobbled?'넓은 여울에서 건넜다. 한 번 크게 흔들렸지만 무사했다.':'넓고 잔잔한 여울에서 건넜다. 몸을 낮추고, 뱃머리를 상류로. 수아호는 곧장 건너편에 닿았다.'):S.crossFord==='A'?'좁은 여울에서 건너려다 배가 뒤집혔다. 물살이 그렇게 셀 줄은 몰랐다.':'굽이에서 소용돌이에 휘말렸다. 한참을 떠밀려서야 겨우 빠져나왔다.');
+  if(S.lostItems&&S.lostItems.length)L.push('묶어 두지 않은 짐 몇 개를 강에 잃었다.');
+  if(S.wasWet&&S.dryBag===false&&S.flags)L.push('젖은 몸으로 덜덜 떨었지만, 결국 마른 옷을 입고 불가에 앉았다.');
+  L.push('동쪽 기슭. 저 아래 선착장이 보인다. 내일이다.');
+  return L;
+};
 // @@DAY_SCREENS@@
 const WEEK=[
   {d:1,theme:'물이 탁해졌다',skill:'식수 만들기',ready:true},
@@ -2556,7 +2632,7 @@ const WEEK=[
   {d:10,theme:'산이 무너졌다',skill:'동굴 안전',w:2,ready:true},
   {d:11,theme:'하늘을 읽다',skill:'날씨 예측',w:2,ready:true},
   {d:12,theme:'배를 엮다',skill:'뗏목·배 수리',w:2,ready:true},
-  {d:13,theme:'물을 건너다',skill:'물가 안전',w:2},
+  {d:13,theme:'물을 건너다',skill:'물가 안전',w:2,ready:true},
   {d:14,theme:'선착장',skill:'낯선 사람과 만나기',w:2},
 ];
 // a reasonable "yesterday" for starting a later day directly
