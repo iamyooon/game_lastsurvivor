@@ -672,8 +672,12 @@ const HERO_NAMES={dau:'재희',son:'재헌'};
 const heroName=()=>HERO_NAMES[CHAR]||'재희';
 const sibName=()=>CHAR==='son'?'재희':'재헌';
 const hasB=n=>(n.charCodeAt(n.length-1)-0xAC00)%28!==0;
-const NAME_RE=/수아|〔형제〕/;
+// route: 재희 follows 아빠 first, 재헌 follows 엄마 first — the story is written for 재희 and the parents swap for 재헌
+const NAME_RE=/수아|〔형제〕/,PAR_RE=/아빠|엄마|아버님|어머님/;
+const needsFix=t=>NAME_RE.test(t)||(CHAR==='son'&&PAR_RE.test(t));
 function nameFix(t){
+  if(!needsFix(t))return t;
+  if(CHAR==='son')t=t.replace(/아빠|엄마|아버님|어머님/g,m=>({'아빠':'엄마','엄마':'아빠','아버님':'어머님','어머님':'아버님'})[m]);
   if(!NAME_RE.test(t))return t;
   const n=heroName(),sb=sibName(),sB=hasB(sb);
   t=t.replace(/〔형제〕(이랑|랑|이|가|은|는|과|와|의|야|아)?/g,(m,j)=>{if(!j)return sb;const J={'이랑':sB?'이랑':'랑','랑':sB?'이랑':'랑','이':sB?'이':'가','가':sB?'이':'가','은':sB?'은':'는','는':sB?'은':'는','과':sB?'과':'와','와':sB?'과':'와','의':'의','야':sB?'아':'야','아':sB?'아':'야'}[j];return sb+J});
@@ -682,11 +686,13 @@ function nameFix(t){
   return t.replace(/윤수아/g,'윤'+n).replace(/수아야/g,b?n+'아':n+'야').replace(/수아예요/g,b?n+'이에요':n+'예요')
     .replace(/수아(가|는|라는|라고|구나|였다|였)/g,(m,p)=>I+p).replace(/수아/g,n);
 }
+const FIXED=new WeakMap();
+function fixText(x){if(FIXED.get(x)===x.nodeValue)return;if(x.parentElement&&x.parentElement.closest('.charlist'))return;if(needsFix(x.nodeValue)){const v=nameFix(x.nodeValue);FIXED.set(x,v);if(v!==x.nodeValue)x.nodeValue=v}}
 function fixNode(root){
   const w=document.createTreeWalker(root,NodeFilter.SHOW_TEXT);let x;
-  while((x=w.nextNode())){if(!NAME_RE.test(x.nodeValue))continue;if(x.parentElement&&x.parentElement.closest('.charlist'))continue;x.nodeValue=nameFix(x.nodeValue)}
+  while((x=w.nextNode()))fixText(x)
 }
-new MutationObserver(ms=>{for(const m of ms){if(m.type==='characterData'){const x=m.target;if(x.nodeValue&&NAME_RE.test(x.nodeValue)&&!(x.parentElement&&x.parentElement.closest('.charlist')))x.nodeValue=nameFix(x.nodeValue)}else m.addedNodes.forEach(a=>a.nodeType===3?(NAME_RE.test(a.nodeValue)&&(a.nodeValue=nameFix(a.nodeValue))):a.nodeType===1&&fixNode(a))}})
+new MutationObserver(ms=>{for(const m of ms){if(m.type==='characterData')fixText(m.target);else m.addedNodes.forEach(a=>a.nodeType===3?fixText(a):a.nodeType===1&&fixNode(a))}})
   .observe(document.documentElement,{subtree:true,childList:true,characterData:true});
 
 
@@ -1139,7 +1145,7 @@ INV_EXTRA.push(['bark','자작나무 껍질'],['twig','잔가지'],['wetwood','�
 addPOI({id:'birch',day:3,x:36,y:318,r:28,name:'자작나무'});
 addPOI({id:'gravel',day:3,x:628,y:70,r:30,name:'강 위쪽 자갈밭'});
 FINDS.push({id:'burntphoto',day:3,x:58,y:468,kind:'mem',name:'타다 남은 사진',
-  text:'오래된 모닥불 자리, 재 속에서 반쯤 탄 사진을 찾았다.\n정류장 앞, 노란 우산을 든 아이와 키 큰 남자.\n뒷면에 볼펜으로 「수아 입학식」.\n\n누군가 여기서 불을 피웠었다. 그날 이후에.'});
+  text:'오래된 모닥불 자리, 재 속에서 반쯤 탄 사진을 찾았다.\n정류장 앞, 노란 우산을 든 아이와 아빠.\n뒷면에 볼펜으로 「수아 입학식」.\n\n누군가 여기서 불을 피웠었다. 그날 이후에.'});
 
 ON_START[3]=()=>{
   const I=S.inv;
@@ -2188,7 +2194,7 @@ function meetStranger(){
       choiceCard('나눔','처음 만난 사람에게','아이가 배고픈 눈으로 쳐다본다. 무엇을 내밀까?',opts,i=>{
         const t=opts[i].t;if(t.startsWith('남은')){if(S.inv.dfish)S.inv.dfish--;else if(S.inv.can)S.inv.can--;else if(S.inv.dand)S.inv.dand--;S.shared='food'}else if(t.startsWith('물병')){S.shared='water'}else S.shared='boat';
         S.met=true;S.mind=clamp100(S.mind+25);emote('♥');Music.musicBox&&Music.musicBox();
-        choiceCard('수아호','노인의 이야기',`${S.shared==='food'?'아이가 생선을 받아 들고 활짝 웃는다. ':S.shared==='water'?'노인이 물을 한 모금 마시고 눈을 감는다. ':''}노인이 강가의 배를 보더니 걸음을 멈춘다.<br><br>"수아호…? 그럼 네가 윤 씨네 아이구나. 작년 가을, 너희 아빠가 저 배로 강 건너 사람들을 하구까지 실어 날랐다. 그러고는 아이들을 찾겠다며 북쪽으로 떠났지."<br><br>노인이 잠시 말을 고른다.<br><br>"그리고… 하구에 매일 저녁 선착장에 나와 앉아 있는 여자가 있다. 정류장에서 아이 손을 놓쳤다고. 가자, 수아. 확인해 봐야지."`,[{t:'고개를 끄덕인다'}],()=>log('노인이 손을 내민다. 선착장으로 가서 함께 배에 오르자.'),'boatname');
+        choiceCard('수아호','노인의 이야기',`${S.shared==='food'?'아이가 생선을 받아 들고 활짝 웃는다. ':S.shared==='water'?'노인이 물을 한 모금 마시고 눈을 감는다. ':''}노인이 강가의 배를 보더니 걸음을 멈춘다.<br><br>"수아호…? 그럼 네가 윤 씨네 아이구나. 작년 가을, 너희 아빠가 저 배로 강 건너 사람들을 하구까지 실어 날랐다. 그러고는 아이들을 찾겠다며 북쪽으로 떠났지."<br><br>노인이 빙그레 웃는다.<br><br>"그런데 말이다, 라디오에서 네 목소리를 듣고 너희 아빠가 대피소에서 내려왔다. 지금 하구에 있어. 매일 저녁 선착장 끝에 나와 앉아 강 위쪽만 보고 있지. 가자, 수아."`,[{t:'고개를 끄덕인다'}],()=>log('노인이 손을 내민다. 선착장으로 가서 함께 배에 오르자.'),'boatname');
       },'dfish');
     });
   },'radio');
@@ -2719,7 +2725,7 @@ JOURNAL[14]=()=>{
   L.push(S.watched?'바위 뒤에서 먼저 지켜봤다. 노인 한 명, 아이 하나. 무기는 없었다.':'선착장에 노인과 아이가 있었다.');
   L.push('빈손을 보이고 이름을 말했다. "저는 수아예요."');
   L.push(S.shared==='food'?'아이에게 생선을 나눠 주었다. 아이가 웃었다.':S.shared==='water'?'노인에게 물을 건넸다.':'노인에게 수아호를 보여 주었다.');
-  L.push('노인은 아빠를 알았다. 작년 가을 아빠가 수아호로 사람들을 날랐다고 했다. 그리고 하구에, 매일 저녁 선착장에 나와 앉아 아이를 기다리는 여자가 있다고.');
+  L.push('노인은 아빠를 알았다. 작년 가을 아빠가 수아호로 사람들을 날랐다고 했다. 그리고 아빠가 지금 하구에서 나를 기다리고 있다고.');
   return L;
 };
 function showEnding2(){
@@ -2734,11 +2740,13 @@ function showEnding2(){
 
 열네 날 동안 익힌 것들. 이제 이 아이에게 가르쳐 줄 수 있다.
 
-하구가 가까워진다. 선착장 끝에 누군가 앉아 있다. 바람에 날리는 머리카락, 낯익은 어깨.
+하구가 가까워진다. 선착장 끝에 누군가 앉아 있다. 낯익은 어깨. 벌떡 일어선다.
+
+아빠다.
 
 나는 마지막 사람이 아니었다.</div>
   <div class="note"><div class="nh">📖 생존 수첩 — 둘째 주에 익힌 것</div><ul>${skills.map((k,i)=>`<li>${i+8}일차 · ${k} ${S.notes.includes(i+8)?'✓':''}</li>`).join('')}</ul></div>
-  <p class="small">3부 — 하구에서. 엄마를 찾고, 이제 둘이 함께. 준비 중이에요.</p>
+  <p class="small">3부 — 아빠와 함께, 엄마를 찾아서. 이제 둘이서 풀어야 하는 길. 준비 중이에요.</p>
   <div class="btns"><button id="restart" class="ghost">처음부터</button><button id="pick" class="ghost">날짜 선택</button></div>`;
   ov.classList.remove('hide');
   const $=id=>document.getElementById(id);
