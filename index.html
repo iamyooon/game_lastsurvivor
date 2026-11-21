@@ -302,7 +302,7 @@ function actionsFor(o){
       a.push({label:'강물 그냥 마시기',cost:5,ok:true,fn:()=>{S.water=Math.min(100,S.water+25);S.hp-=12;S.drankRiver++;S.sick=true;log('목은 축였지만 속이 뒤틀린다. (체력 -12, 배탈)')}});
       break;
     case 'fire':
-      if(!S.fire&&stormLevel()>.1)a.push({label:'불 피우기',cost:0,ok:false,why:'비가 퍼붓는다',fn:()=>{}});
+      if(!S.fire&&stormLevel()>.1&&!(S.day===11&&S.lean>=2))a.push({label:'불 피우기',cost:0,ok:false,why:'비가 퍼붓는다',fn:()=>{}});
       else if(!S.fire&&S.day>=3)fireBuildActions(a);
       else if(!S.fire){
         if(I.lighter)a.push({label:'라이터로 불 피우기 (땔감 2)',cost:10,ok:I.wood>=2,why:'땔감이 부족하다',fn:lightFire});
@@ -1837,6 +1837,180 @@ MONO[10]=()=>{
   else s='횃불을 들고 천천히. 출구는 동쪽 어딘가에 있다.';
   return {s,count:`동굴 — 횃불 ${S.torchLit?Math.max(0,S.torch|0)+'분':'✗'} · 표시 ${ck(S.marked)} · 천장 ${ck(S.ceiling)} · 출구 ${ck(p.x>700)}`};
 };
+// ===== VALLEY MAP (days 11–14): the river valley below the cave =====
+function choiceCard(title,sub,prompt,opts,onPick,icon){
+  S.running=false;
+  card.innerHTML=`${icon?`<div class="icon">${iconImg(icon,60)}</div>`:''}<h2>${title}</h2><div class="sub">${sub}</div>
+  <p>${prompt}</p><div class="daylist" id="cb">${opts.map((o,i)=>`<button data-i="${i}"><span><b>${o.t}</b></span>${o.d?`<span class="sk">${o.d}</span>`:''}</button>`).join('')}</div><p class="small" id="cm"></p>`;
+  ov.classList.remove('hide');
+  document.querySelectorAll('#cb button').forEach(b=>b.onclick=()=>{
+    const o=opts[+b.dataset.i];
+    if(o.retry){Sfx.play('leave');document.getElementById('cm').textContent=o.retry;b.disabled=true;b.style.opacity=.45;return}
+    Sfx.play('pick');ov.classList.add('hide');S.running=true;dirtyUI=true;onPick(+b.dataset.i);
+  });
+}
+const RV={cx:y=>500+Math.sin(y/90)*40,hw:y=>{const T=[[0,22],[110,20],[200,36],[300,50],[380,44],[440,40],[480,46]];for(let i=1;i<T.length;i++)if(y<=T[i][0]){const [y0,a]=T[i-1],[y1,b2]=T[i];return a+(b2-a)*(y-y0)/(y1-y0)}return 46}};
+const inRiver=(x,y,pad=0)=>Math.abs(x-RV.cx(y))<RV.hw(y)+pad;
+const FORDS={A:{x:505,y:108,name:'좁은 여울',ey:108},B:{x:430,y:300,name:'넓은 여울',ey:300},C:{x:404,y:452,name:'굽이',ey:452}};
+const DOCK={x:540,y:440};
+(function(){
+  const rocks=[[250,150,22,14],[330,410,18,12],[620,140,20,14],[740,180,18,12],[300,60,30,16],[700,90,26,14]];
+  const walk=(x,y)=>{
+    if(y<26&&x>130)return false;
+    if(inRiver(x,y,3))return S&&S.inBoat;
+    if(x>DOCK.x-34&&x<DOCK.x+6&&Math.abs(y-DOCK.y)<9)return true;
+    for(const [rx,ry,a,b2] of rocks){const dx=(x-rx)/a,dy=(y-ry)/b2;if(dx*dx+dy*dy<1)return false}
+    return true};
+  const bg=document.createElement('canvas');bg.width=LW;bg.height=LH;const b=bg.getContext('2d');
+  seed=1111;const nz=noiseGrid(12,LW,LH),nz2=noiseGrid(5,LW,LH);
+  for(let y=0;y<LH;y++)for(let x=0;x<LW;x++){
+    const w=x*2,h=y*2,cx=RV.cx(h),hw=RV.hw(h),d=Math.abs(w-cx);
+    let c;
+    if(h<26&&w>130){c=(nz2(x,y)>.5)?'#4a4540':'#3e3a36';if(h>18)c='#6a6258'}
+    else if(d<hw){const deep=1-d/hw,dk=(h>420&&h<480)?.15:0;
+      c=deep+dk>.7?'#244058':deep+dk>.4?'#2f5470':'#3e6a86';
+      if(h<150&&(x*3+y*7+(h|0))%11===0)c='#9ec4d8';
+      if(bay(x,y)<.04)c='#5e8aa4'}
+    else if(d<hw+14){c=nz2(x,y)<.5?'#8a8070':'#7a7062';if(bay(x,y)<.1)c='#a49a88'}
+    else{const v=nz(x,y)*.6+nz2(x,y)*.4;c=v<.35?'#4e5e36':v<.6?'#5a6a3e':'#667644';if(bay(x,y)<.05)c='#7a8a50';if(w<130&&h<60)c=v<.5?'#3e3a36':'#4a4540'}
+    P(b,x,y,c);
+  }
+  // grass tufts & flowers
+  for(let i=0;i<500;i++){const x=rnd()*LW|0,y=rnd()*LH|0,w=x*2,h=y*2;if(!inRiver(w,h,16)&&h>30){P(b,x,y,rnd()<.15?'#c8b860':'#7e8e4c');P(b,x,y-1,'#8e9e58')}}
+  // cave mouth (top-left)
+  P(b,L(40)-10,L(30)-8,'#141210',20,10);P(b,L(40)-8,L(30)-9,'#2a2622',16,1);
+  // boulders
+  rocks.forEach(([x,y,a,bb])=>{ellipseFill(b,L(x),L(y),a/2,bb/2,(dx,dy)=>dx+dy<-2?'#8a847a':dy>bb/4?'#4a4640':'#6a645c')});
+  // the dock: planks on posts
+  for(let i=0;i<8;i++){P(b,L(DOCK.x)-17+i*2,L(DOCK.y)-4,i%2?'#7a5a3a':'#8a6a44',2,8);}
+  P(b,L(DOCK.x)-17,L(DOCK.y)-5,'#5a3e26',16,1);P(b,L(DOCK.x)-17,L(DOCK.y)+4,'#5a3e26',16,1);
+  [[-17,-5],[-17,4],[-3,-5],[-3,4]].forEach(([dx,dy])=>P(b,L(DOCK.x)+dx,L(DOCK.y)+dy,'#3a2a1a',1,2));
+  const PINE=bake(stackLayers(14,14,12,(c,k,n)=>{const r=6.5-k*5.5/n;if(k<2){ellipseFill(c,7,7,1,1,()=>'#4a3420');return}ellipseFill(c,7,7,r,r,(dx,dy)=>dx+dy<-2?'#4a6e3e':(dx*dx+dy*dy)>r*r*.6?'#24402a':'#2e5434')},.45));
+  const trees=[[100,340],[60,180],[180,90],[90,420],[260,440],[300,230],[30,300],[640,60],[760,330],[700,450],[600,200],[780,120],[760,240]];
+  const LEAN=bake(stackLayers(26,16,12,(c,k,n)=>{const w=24-k*2;if(w<2)return;c.fillStyle=k%3===0?'#4a6e3e':'#2e5434';c.fillRect(13-w/2,2,w,12);c.fillStyle='#4a3420';c.fillRect(13-w/2,2,1,12);c.fillRect(12+w/2,2,1,12)},.45));
+  const POLES=bake(stackLayers(26,16,12,(c,k,n)=>{c.fillStyle='#6a4a2a';const w=24-k*2;if(w<2)return;c.fillRect(13-w/2,3,1,1);c.fillRect(12+w/2,3,1,1);c.fillRect(13-w/2,12,1,1);c.fillRect(12+w/2,12,1,1);if(k===n-1)c.fillRect(1,7,24,1)},.3));
+  const boatSpr=(x,y,flip,up)=>{x=Math.round(x);y=Math.round(y);
+    if(!up){P(lc,x-10,y-2,'#3a2a1a',20,5);P(lc,x-9,y-3,'#5a3e26',18,1);P(lc,x-8,y-1,'#6a4a2e',16,1);return}
+    P(lc,x-11,y-3,'#3a2a1a',22,6);P(lc,x-10,y-2,'#7a5a3a',20,4);P(lc,x-8,y-1,'#4a3420',16,2);P(lc,x-3,y-2,'#8a6a44',1,4);P(lc,x+3,y-2,'#8a6a44',1,4);
+    (S.holes||[]).forEach((hh,i)=>{if(!hh)P(lc,x-6+i*5,y,'#1a1410')});
+    if(S.lashed)P(lc,x-1,y-3,'#a08048',3,2);};
+  MAPS.valley={bg,walk,
+    areas:[{id:'v_cave',x:60,y:60,msg:'동굴 출구 아래로 넓은 강 골짜기가 펼쳐진다. 물소리가 크다.'},{id:'v_river',x:440,y:240,msg:'강이다. 생각보다 넓고 빠르다. 건너편이 동쪽 기슭.'},{id:'v_wreck',x:462,y:236,msg:'강가에 뒤집힌 나룻배 한 척이 얹혀 있다.'},{id:'v_east',x:660,y:260,msg:'동쪽 기슭. 저 아래 하구 쪽에 낡은 선착장이 보인다.'},{id:'v_dock',x:DOCK.x,y:DOCK.y,msg:'나무 선착장. 말뚝에 새 밧줄이 묶여 있다. 누군가 쓰고 있다.'}],
+    labels:[['동굴',40,12],['서쪽 기슭',200,200],['강',500,40],['동쪽 기슭',680,200],['선착장',DOCK.x,DOCK.y-22]],
+    nearWater:p=>!S.inBoat&&inRiver(p.x,p.y,18),
+    inShelter:p=>(S.lean>=2&&Math.hypot(p.x-200,p.y-240)<30)||(S.crossed&&Math.hypot(p.x-680,p.y-250)<26),
+    pois:[
+      {id:'bed',x:172,y:278,r:22,name:'서쪽 기슭 야영지',when:()=>!S.crossed},
+      {id:'fire',key:'west',x:228,y:266,r:20,name:'서쪽 모닥불 자리',when:()=>!S.crossed},
+      {id:'mp_wood',x:70,y:220,r:28,name:'솔숲의 삭정이',when:()=>!S.crossed},
+      {id:'v_pine',x:100,y:344,r:24,name:'늙은 소나무',when:()=>!S.crossed},
+      {id:'v_sky',x:150,y:110,r:28,name:'언덕 위 바위 (하늘이 트인 곳)'},
+      {id:'v_lean',x:200,y:240,r:22,name:'바위 아래 비 피할 자리',when:()=>!S.crossed},
+      {id:'v_drift',x:488,y:165,r:24,name:'떠밀려 온 나무 더미',when:()=>!S.crossed},
+      {id:'v_moss',x:380,y:150,r:22,name:'이끼 낀 바위',when:()=>!S.crossed},
+      {id:'v_wreck',x:462,y:236,r:24,name:'뒤집힌 나룻배',when:()=>!S.crossed},
+      {id:'v_birds',x:330,y:330,r:28,name:'풀밭',only:[11]},
+      {id:'v_fA',x:FORDS.A.x,y:FORDS.A.y,r:22,name:'좁은 여울',only:[13],when:()=>!S.crossed},
+      {id:'v_fB',x:FORDS.B.x,y:FORDS.B.y,r:22,name:'넓은 여울',only:[13],when:()=>!S.crossed},
+      {id:'v_fC',x:FORDS.C.x,y:FORDS.C.y,r:22,name:'굽이',only:[13],when:()=>!S.crossed},
+      {id:'bed',x:680,y:250,r:26,name:'동쪽 기슭 야영지',when:()=>S.crossed},
+      {id:'fire',key:'east',x:650,y:290,r:24,name:'동쪽 모닥불 자리',when:()=>S.crossed},
+      {id:'mp_wood',x:720,y:190,r:28,name:'동쪽 솔숲의 삭정이',when:()=>S.crossed},
+      {id:'v_epine',x:760,y:330,r:24,name:'푸른 소나무',when:()=>S.crossed},
+      {id:'v_signal',x:640,y:380,r:28,name:'트인 자갈밭 (신호 자리)',only:[14]},
+      {id:'v_dock',x:DOCK.x,y:DOCK.y,r:26,name:'선착장',when:()=>S.crossed},
+      {id:'v_stranger',x:DOCK.x+30,y:DOCK.y-14,r:30,name:'낯선 사람',only:[14],when:()=>S.boatArrived},
+    ],
+    lights:()=>S.signalFires?S.signalFires.map(([x,y])=>[L(x),L(y),60,1]):[],
+    items:now=>{
+      const it=trees.map(([x,y])=>({y:L(y)+3,f:()=>putStack(PINE,L(x),L(y))}));
+      if(S.lean===1)it.push({y:L(240)-2,f:()=>putStack(POLES,L(200),L(240))});
+      if(S.lean>=2)it.push({y:L(240)-2,f:()=>putStack(LEAN,L(200),L(240))});
+      // the boat
+      const bp=S.boatPos||{x:462,y:236};
+      it.push({y:L(bp.y)+3,f:()=>boatSpr(L(bp.x),L(bp.y),0,!!S.boatUp)});
+      // the paddle leaning by the camp
+      if(S.paddle&&!S.crossed)it.push({y:L(262)+1,f:()=>{P(lc,L(160),L(262)-10,'#8a6a44',1,10);P(lc,L(160)-1,L(262)-12,'#a08058',3,4)}});
+      // strangers' boat & people
+      if(S.day===14&&S.ferryT!==undefined){const k=Math.min(1,Math.max(0,(S.t-S.ferryT)/60)),fx=L(DOCK.x)-22,fy=L(480)+(L(DOCK.y)-L(480))*k;
+        it.push({y:fy+3,f:()=>{P(lc,fx-12,fy-3,'#3a2a1a',24,6);P(lc,fx-11,fy-2,'#9a7a52',22,4);if(k<1){drawPerson(fx-4,fy-6,'#6a6a74','#c8c0b0');drawPerson(fx+4,fy-5,'#7a5a3a','#3a2a1a',1)}}})}
+      if(S.boatArrived){const sx=L(DOCK.x+30),sy=L(DOCK.y-14);it.push({y:sy+10,f:()=>{drawPerson(sx,sy,'#6a6a74','#c8c0b0');drawPerson(sx+9,sy+2,'#7a5a3a','#3a2a1a',1)}})}
+      return it},
+    drawGround:now=>{
+      // flowing ripples
+      const t=now/400;for(let i=0;i<40;i++){const h=(i*12+t*(i%3+2)*6)%480,cx=RV.cx(h),hw=RV.hw(h),x=L(cx+((i*37)%(hw*2|0))-hw);P(lc,x,L(h),'rgba(200,225,240,.5)',2,1)}
+      if(S.day===13)['A','B','C'].forEach(k=>{const f=FORDS[k];P(lc,L(f.x)-1,L(f.y)-6,'#8a6a44',1,6);P(lc,L(f.x),L(f.y)-6,S.fordSeen&&S.fordSeen[k]?'#e8c870':'#c8c0b0',3,2)});
+      if(S.signalFires)S.signalFires.forEach(([x,y])=>{putStack(STONES_ST,L(x),L(y));drawFlames(L(x),L(y),now);
+        for(let k=0;k<6;k++){const sy=L(y)-8-((now/60+k*9)%40),sx=L(x)+Math.sin(now/500+k)*3+((now/60+k*9)%40)*.25;lc.fillStyle=`rgba(225,225,220,${.55-((now/60+k*9)%40)/80})`;lc.beginPath();lc.arc(sx,sy,2+((now/60+k*9)%40)/10,0,7);lc.fill()}});
+      // cloud shadows drifting
+      const cl=S.clouds||0;for(let i=0;i<cl;i++){const x=((now/90+i*130)%(LW+120))-60,y=(i*67)%LH;lc.fillStyle='rgba(10,14,20,.13)';lc.beginPath();lc.ellipse(x,y,40,18,0,0,7);lc.fill()}
+    },
+  };
+})();
+function drawPerson(x,y,coat,hair,small){x=Math.round(x);y=Math.round(y);const s=small?1:0;
+  lc.fillStyle='rgba(8,10,6,.4)';lc.beginPath();lc.ellipse(x+1,y+10-s,4,1.5,0,0,7);lc.fill();
+  P(lc,x-2,y-8+s*2,hair,5,2);P(lc,x-2,y-6+s*2,'#d8b090',5,3);P(lc,x-3,y-3+s*2,coat,7,8-s*2);P(lc,x-2,y+5,'#3a3630',2,4-s);P(lc,x+1,y+5,'#3a3630',2,4-s)}
+// shared: camp chores on the road
+DAY_HOOKS.actions.push((o,a)=>{
+  if(!o||!curMap()||o.id!=='fire'||!S.fire||!S.wet)return;
+  a.push({label:'젖은 옷 불에 말리기',cost:40,ok:true,fn:()=>{S.wet=false;S.warm=clamp100(S.warm+15);log('불가에 옷을 펼쳐 말렸다. 김이 모락모락 오른다. 뼛속까지 따뜻해진다.')}});
+});
+function goValley(x,y){if(!S.map||S.map==='home')applyPack();setMap('valley',x,y);S.inBoat=false;S.rainLv=0;S.clouds=0}
+// ===== DAY 11 · 하늘을 읽다 (날씨 읽기) =====
+addIcons({
+  pole:[['......t','.....t.','....t..','...t...','..t....','.t.....','t......'],{t:'#6a4a2a'}],
+  bough:[['...g...','..ggg..','.gGgGg.','..ggg..','.gGgGg.','...t...','...t...'],{g:'#2e5434',G:'#4a6e3e',t:'#4a3420'}],
+});
+INV_EXTRA.push(['pole','긴 장대'],['bough','솔가지']);
+const SKY_SIGNS={cirrus:'새털구름',halo:'햇무리',birds:'낮게 나는 제비',smoke:'낮게 깔리는 연기',west:'서쪽의 먹구름',red:'저녁노을'};
+ON_START[11]=()=>{goValley(60,64);S.sky={};S.lean=0;S.dryWood=0;S.poleLeft=4;S.boughLeft=4;S.d11={}};
+PRESET[11]=()=>{S.notes.push(10);S.found.carving=1;S.marked=true;S.ceiling=true};
+DAY_HOOKS.tick.push(m=>{
+  if(S.day!==11||S.map!=='valley')return;const h=S.t/60;
+  S.clouds=h<10?1:h<12?3:h<14?6:h<18.5?9:h<19.5?3:1;
+  S.rainLv=h<14?0:h<15?(h-14)*.9:h<18.5?.9:h<19?(19-h)*1.8:0;
+  if(h>=12.5)once('d11w1',()=>log('바람 방향이 바뀌었다. 서쪽에서 축축한 바람이 분다.'));
+  if(h>=14)once('d11r',()=>{emote('!');log(S.lean>=2?'후드득— 비다! 미리 엮어 둔 비 피할 자리로 가자.':'후드득— 비가 오기 시작했다!');if(S.fire&&S.firePos==='west'&&!(S.lean>=2)){S.fire=false;log('빗줄기에 모닥불이 꺼졌다.')}});
+  if(h>=14.2&&h<18.5&&S.inv.wood>0&&!inShelter()){S.d11.wetWood=(S.d11.wetWood||0)+m;if(S.d11.wetWood>20){S.d11.soaked=(S.d11.soaked||0)+S.inv.wood;S.inv.wood=0;once('d11ww',()=>log('들고 다니던 장작이 비에 흠뻑 젖어 버렸다. 젖은 나무로는 불이 안 붙는다.'))}}
+  if(h>=18.6)once('d11stop',()=>{emote('♥');log('비가 그쳤다. 서쪽 하늘 구름 사이로 붉은 빛이 번진다.')});
+});
+DAY_HOOKS.actions.push((o,a)=>{
+  if(!o||S.day!==11)return;const I=S.inv,h=S.t/60,sk=S.sky;
+  if(o.id==='v_sky'){
+    a.push({label:'하늘 살피기',cost:10,ok:true,fn:()=>{
+      if(h>=18.6){sk.red=1;emote('♥');log('저녁노을이 붉게 탄다. "저녁노을은 맑음" — 내일은 날이 갤 것이다.');return}
+      if(h<10){sk.cirrus=1;log('높은 하늘에 새털 같은 구름이 갈고리 모양으로 흩어져 있다. 날씨가 바뀌기 전에 먼저 오는 구름이다.')}
+      else if(h<13){sk.halo=1;emote('?');log('구름이 엷게 하늘을 덮었다. 해 둘레에 둥근 무리가 졌다. 햇무리는 비가 가까워졌다는 신호.')}
+      else if(h<14){sk.west=1;emote('sweat');log('서쪽 산마루 위로 낮고 검은 구름이 쌓인다. 바람이 차다. 한두 시간 안에 비가 온다.')}
+      else log('비구름이 낮게 깔려 산마루를 지운다. 지금은 비를 피할 때다.');
+    }});
+  }
+  if(o.id==='v_birds'&&h>=10&&h<14)a.push({label:'새 지켜보기',cost:10,ok:true,fn:()=>{sk.birds=1;log('제비들이 풀잎을 스칠 듯 낮게 난다. 공기가 무거워져 벌레가 낮게 날기 때문이다. 비가 온다는 뜻.')}});
+  if(o.id==='fire'&&S.fire&&h<14)a.push({label:'연기 살피기',cost:5,ok:true,fn:()=>{sk.smoke=1;log(h>=10?'연기가 위로 오르지 못하고 땅에 낮게 깔려 흩어진다. 기압이 낮아지고 있다.':'연기가 곧게 위로 오른다. 아직은 날이 좋다.');if(h<10)delete sk.smoke}});
+  if(o.id==='v_drift')a.push({label:'긴 장대 고르기',cost:15,ok:(S.poleLeft||0)>0,why:'쓸 만한 장대가 없다',fn:()=>{S.poleLeft--;I.pole=(I.pole||0)+1;log('떠밀려 온 나무 중에 곧고 긴 것을 골랐다. (장대 +1)')}});
+  if(o.id==='v_pine')a.push({label:'솔가지 꺾기',cost:15,ok:(S.boughLeft||0)>0,why:'손 닿는 가지를 다 꺾었다',fn:()=>{S.boughLeft--;I.bough=(I.bough||0)+1;log('잎이 무성한 솔가지를 꺾었다. 비를 잘 튕겨 낸다. (솔가지 +1)')}});
+  if(o.id==='v_lean'){
+    if(!S.lean)a.push({label:'장대 기대어 묶기 (장대 3·끈 1)',cost:30,ok:(I.pole||0)>=3&&(I.cord||0)>=1,why:(I.pole||0)<3?'장대가 3개 필요하다':'묶을 끈이 없다',fn:()=>{I.pole-=3;I.cord--;S.lean=1;log('바위에 장대를 비스듬히 기대고 끈으로 묶었다. 뼈대가 섰다. 이제 덮을 것을.')}});
+    if(S.lean===1)a.push({label:'솔가지 겹쳐 덮기 (솔가지 3)',cost:30,ok:(I.bough||0)>=3,why:'솔가지가 3개 필요하다',fn:()=>{I.bough-=3;S.lean=2;Sfx.play('rustle');emote('♥');log('아래에서부터 기와처럼 솔가지를 겹쳐 덮었다. 빗물이 바깥으로 흘러내리게. 비 피할 자리 완성.')}});
+    if(S.lean>=2&&I.wood>0)a.push({label:`장작 안에 쌓아 두기 (${I.wood})`,cost:10,ok:true,fn:()=>{S.dryWood+=I.wood;I.wood=0;log('장작을 비 피할 자리 안쪽 깊숙이 쌓았다.')}});
+    if(S.lean>=2&&S.dryWood>0&&S.t>=14*60)a.push({label:'마른 장작 꺼내기',cost:5,ok:true,fn:()=>{I.wood+=S.dryWood;S.dryWood=0;log('비를 피해 둔 장작은 바싹 말라 있다.')}});
+  }
+});
+// a fire lit under rain needs dry wood and the lean-to
+DAY_HOOKS.actions.push((o,a)=>{
+  if(!o||S.day!==11||o.id!=='fire'||S.fire)return;
+  if(stormLevel()>.3&&!(S.lean>=2)){for(let i=a.length-1;i>=0;i--)if(a[i].label.startsWith('불 피우기')){a[i].ok=false;a[i].why='빗속에선 불이 붙지 않는다'}}
+});
+MONO[11]=()=>{
+  const I=S.inv,h=S.t/60,sk=S.sky,n=Object.keys(sk).filter(k=>k!=='red').length;let s;
+  if(h>=18.6)s=sk.red?'저녁노을. 내일은 맑다. 불 곁에서 쉬자.':'비가 그쳤다. 언덕 위에서 저녁 하늘을 한번 보자.';
+  else if(h>=14)s=S.lean>=2?(inShelter()?'비 피할 자리 안이다. 비가 그칠 때까지 기다리자.':'비다! 엮어 둔 비 피할 자리로 가자.'):'비가 쏟아진다. 바위 아래에라도 숨자. 미리 준비했어야 했다.';
+  else if(n<2)s=h<10?'하늘이 맑다. 하지만 언덕 위에 올라 하늘을 자세히 살펴보자.':'날씨가 변하고 있을까? 하늘, 새, 연기를 살펴보자.';
+  else if(S.lean<2)s=`신호가 ${n}개. 비가 온다. 오후 전에 바위 아래 비 피할 자리를 엮자 — 장대 3, 끈, 솔가지 3.`;
+  else if(S.dryWood<2&&I.wood<2)s='비 피할 자리는 됐다. 비 오기 전에 마른 장작을 모아 안에 쌓아 두자.';
+  else s='준비는 됐다. 하늘이 어떻게 바뀌는지 지켜보자.';
+  return {s,count:`날씨 신호 ${n}/5 · 비 피할 자리 ${S.lean>=2?'✓':S.lean?'뼈대':'✗'} · 마른 장작 ${S.dryWood+(h<14?I.wood:0)}`};
+};
 // @@DAY_WORLD@@
 // ---------- loop ----------
 let last=performance.now();
@@ -2288,6 +2462,21 @@ JOURNAL[10]=(forced,home)=>{
   if(S.found.carving)L.push('바위벽에 아빠가 새긴 글씨. 「수아 — 아빠 여기 지나감. 아래쪽 길로.」 50년 전 같은 굴, 같은 갈림길.');
   return L;
 };
+DAYS[11]={theme:'하늘을 읽다',wake:'동굴 출구에서 눈을 떴다. 아래로 강 골짜기가 보인다. 하늘은 맑다… 지금은.',
+  intro:()=>`<h2>11일차</h2><div class="sub">하늘을 읽다 · 새 지도: 강 골짜기</div>
+  <p>동굴을 빠져나와 강 골짜기로 내려왔다. 하늘은 파랗고 바람은 잔잔하다. 그런데 높은 하늘의 구름 모양이 마음에 걸린다.</p>
+  <p>오늘은 <b>하늘과 주변을 보고 날씨를 미리 읽는 법</b>을 익힌다. 비가 온다면, 오기 전에 준비해야 한다.</p>
+  <p class="small">언덕 위 바위에서 하늘을, 풀밭에서 새를, 모닥불에서 연기를 살펴보세요.<br>시간에 따라 하늘이 달라집니다.</p>`};
+NOTES[11]={title:'날씨 읽기',body:['높은 하늘의 새털구름(권운)은 하루 이틀 안에 날씨가 바뀔 수 있다는 첫 신호.','해나 달 둘레의 무리(햇무리·달무리)는 비구름이 다가온다는 뜻.','제비가 낮게 날고, 연기가 땅에 깔리면 기압이 낮아지는 중이다.','바람이 갑자기 바뀌고 서쪽에 낮고 검은 구름이 쌓이면 한두 시간 안에 비.','"아침노을은 비, 저녁노을은 맑음." 비가 오기 전에 비 피할 곳과 마른 장작부터.'],
+  did:()=>{const k=Object.keys(S.sky||{}).map(k=>SKY_SIGNS[k]);if(S.lean>=2)k.push('비 피할 자리');if(S.dryWood||S.flags&&S.flags.d11r&&S.fire)k.push('장작 지키기');return k.join(' · ')||'아직 못 해 봄'}};
+JOURNAL[11]=()=>{
+  const L=['11일차.'],sk=S.sky||{},n=Object.keys(sk).filter(k=>k!=='red').length;
+  L.push(n>=2?`아침엔 맑았다. 그런데 ${Object.keys(sk).filter(k=>k!=='red').map(k=>SKY_SIGNS[k]).join(', ')}… 하늘이 미리 말해 주고 있었다.`:'아침엔 그저 맑은 날인 줄 알았다.');
+  L.push(S.lean>=2?'바위에 장대를 기대고 솔가지를 덮었다. 오후 내내 퍼붓는 비를 그 아래에서 마른 채로 지켜봤다.':'비가 쏟아졌을 때 피할 곳이 없었다. 바위 그늘에 웅크려 떨었다.');
+  if(S.wasWet)L.push('결국 흠뻑 젖었다.');
+  if(sk.red)L.push('비가 그친 뒤 서쪽이 붉게 탔다. 내일은 맑을 것이다. 아빠가 하던 말이 생각났다. "저녁노을은 맑음."');
+  return L;
+};
 // @@DAY_SCREENS@@
 const WEEK=[
   {d:1,theme:'물이 탁해졌다',skill:'식수 만들기',ready:true},
@@ -2300,7 +2489,7 @@ const WEEK=[
   {d:8,theme:'끈이 필요하다',skill:'끈과 매듭',w:2,ready:true},
   {d:9,theme:'짐을 꾸리다',skill:'장거리 이동 준비',w:2,ready:true},
   {d:10,theme:'산이 무너졌다',skill:'동굴 안전',w:2,ready:true},
-  {d:11,theme:'하늘을 읽다',skill:'날씨 예측',w:2},
+  {d:11,theme:'하늘을 읽다',skill:'날씨 예측',w:2,ready:true},
   {d:12,theme:'배를 엮다',skill:'뗏목·배 수리',w:2},
   {d:13,theme:'물을 건너다',skill:'물가 안전',w:2},
   {d:14,theme:'선착장',skill:'낯선 사람과 만나기',w:2},
