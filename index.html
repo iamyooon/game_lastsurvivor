@@ -1908,7 +1908,7 @@ const DOCK={x:540,y:440};
       {id:'v_lean',x:200,y:240,r:22,name:'바위 아래 비 피할 자리',when:()=>!S.crossed},
       {id:'v_drift',x:488,y:165,r:24,name:'떠밀려 온 나무 더미',when:()=>!S.crossed},
       {id:'v_moss',x:380,y:150,r:22,name:'이끼 낀 바위',when:()=>!S.crossed},
-      {id:'v_wreck',x:462,y:236,r:24,name:'뒤집힌 나룻배',when:()=>!S.crossed&&S.day<=12},
+      {id:'v_wreck',x:462,y:236,r:24,name:'뒤집힌 나룻배',when:()=>!S.crossed&&(S.day<=12||!S.boatReady)},
       {id:'v_birds',x:330,y:330,r:28,name:'풀밭',only:[11]},
       {id:'v_fA',x:FORDS.A.x,y:FORDS.A.y,r:22,name:'좁은 여울',only:[13],when:()=>!S.crossed},
       {id:'v_fB',x:FORDS.B.x,y:FORDS.B.y,r:22,name:'넓은 여울',only:[13],when:()=>!S.crossed},
@@ -2026,7 +2026,7 @@ FINDS.push({id:'boatname',map:'valley',day:12,x:478,y:250,when:()=>S.boatSeen&&!
 ON_START[12]=()=>{if(S.map!=='valley')goValley(172,278);else{S.p={x:172,y:278,face:1,step:0};CAM.snap=true}S.rainLv=0;S.clouds=1;S.holes=[0,0,0];S.boatUp=false;S.boatSeen=false;S.boatReady=false;S.mossLeft=4;S.resinLeft=4;S.charLeft=2;S.ropeLeft=1;S.plankLeft=1};
 PRESET[12]=()=>{S.notes.push(11);S.sky={cirrus:1,halo:1,red:1};S.lean=2};
 DAY_HOOKS.actions.push((o,a)=>{
-  if(!o||S.day!==12)return;const I=S.inv,H=S.holes;
+  if(!o||(S.day!==12&&!(S.day===13&&!S.boatReady)))return;const I=S.inv,H=S.holes=S.holes||[0,0,0];S.mossLeft=S.mossLeft??4;S.resinLeft=S.resinLeft??4;S.charLeft=S.charLeft??2;S.ropeLeft=S.ropeLeft??1;S.plankLeft=S.plankLeft??1;
   if(o.id==='v_wreck'){
     if(!S.boatSeen)a.push({label:'배 살펴보기',cost:15,ok:true,fn:()=>{S.boatSeen=true;emote('!');log('나무로 만든 작은 나룻배다. 뼈대는 튼튼하다. 바닥에 구멍이 세 군데, 노는 없다. 고칠 수 있다! 뱃머리에 뭔가 쓰여 있다.')}});
     else if(!S.boatUp)a.push({label:'배 바로 뒤집기',cost:30,ok:true,fn:()=>{S.boatUp=true;S.hp-=3;Sfx.play('wood');log('끙— 온몸으로 밀어 배를 바로 뒤집었다. 바닥의 구멍 세 개가 하늘을 본다.')}});
@@ -2117,6 +2117,7 @@ MONO[13]=()=>{
     else if(!S.fire)s='동쪽 기슭이다. 불을 피우고 몸을 녹이자.';
     else s='강을 건넜다. 야영지에서 쉬자. 내일은 선착장.';
   }
+  else if(!S.boatReady||!S.paddle)s=MONO[12]().s;
   else if(n<3)s='건널 곳은 세 군데. 좁은 여울, 넓은 여울, 굽이. 막대를 던져 물살부터 보자.';
   else if(!S.lashed||!S.dryBag)s='어디서 건널지 정했다면, 짐을 배에 묶고 마른 옷을 싸 두자.';
   else s='넓고 잔잔한 곳으로. 몸은 낮게, 뱃머리는 상류 쪽으로.';
