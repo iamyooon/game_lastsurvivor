@@ -1313,13 +1313,17 @@ addIcons({
   routemap:[['ppppppp','pbbpppp','ppbpppp','pppbppp','ppppbrp','pppppbp','ppppppp'],{p:'#e8e0cc',b:'#3a62b0',r:'#c83a30'}],
 });
 addPOI({id:'hill',day:6,x:380,y:40,r:34,name:'북쪽 언덕'});
-addPOI({id:'stickspot',day:6,x:470,y:330,r:24,name:'쉼터 앞 공터'});
+addPOI({id:'stickspot',day:6,x:500,y:352,r:28,name:'쉼터 앞 공터'});
 FINDS.push({id:'routemap',day:6,x:612,y:36,kind:'mem',name:'버스 노선도 조각',
   text:'정류장 뒤 수풀에서 녹슨 노선도 판 조각을 주웠다.\n강을 따라 북쪽으로 이어지던 파란 선이 산 앞에서 끊겼다. 끝에 「북부 대피소」.\n\n그 옆에 누군가 펜으로 동그라미를 쳐 놓았다.\n「배 — 강 하구 선착장」'});
 
 ON_START[6]=()=>{S.stick=null;if(S.wound){if(S.wound!=='dressed'||S.infected)S.hp=Math.max(30,S.hp-10);S.wound=null;S.infected=false}};
 PRESET[6]=()=>{const I=S.inv;I.bandage=0;S.pharmacyDone=true;S.found.graffiti='seen';S.notes=[1,2,3,4,5];[[44,254],[34,226]].forEach(([x,y])=>revealOn(S.fog,x,y,12))};
 
+const STICK={x:252,y:177};
+// shadow tip of the stick (buffer px): west in the morning, north at noon, east in the evening; longer when the sun is low
+function stickTip(t){const phi=Math.max(0,Math.min(1,(t/60-6)/12))*Math.PI,len=4+8*Math.abs(Math.cos(phi));return [Math.round(-Math.cos(phi)*len),Math.round(-Math.sin(phi)*len)]}
+DAY_HOOKS.sprites.push(items=>{if(S.day===6&&(S.stick||S.shadowDone))items.push({y:STICK.y+1,f:()=>{P(lc,STICK.x,STICK.y-13,'#8a6a44',1,14);P(lc,STICK.x+1,STICK.y-13,'#5a3e26',1,14);P(lc,STICK.x-1,STICK.y,'rgba(0,0,0,.35)',3,1)}})});
 function northCount(){return [S.sawSunrise,S.shadowDone,S.foundPolaris].filter(Boolean).length}
 function checkNorth(){if(!S.northKnown&&northCount()>=2){S.northKnown=true;emote('!');log('두 가지 방법이 같은 쪽을 가리킨다. 북쪽은 언덕 너머, 강 상류 쪽이다.')}}
 DAY_HOOKS.actions.push((o,a)=>{
@@ -1329,7 +1333,7 @@ DAY_HOOKS.actions.push((o,a)=>{
     if(!S.stick)a.push({label:'막대 꽂고 그림자 끝 표시',cost:10,ok:S.t>=9*60&&S.t<16*60,why:S.t<9*60?'해가 아직 낮다':'해가 너무 기울었다',fn:()=>{S.stick={t:S.t};log('곧은 막대를 땅에 꽂고, 그림자 끝에 작은 돌을 놓았다. 그림자가 움직이길 기다리자.')}});
     else a.push({label:'두 번째 그림자 끝 표시',cost:10,ok:true,fn:()=>{
       if(S.t-S.stick.t<30){emote('?');log('그림자가 거의 안 움직였다. 좀 더 기다리자. (30분쯤)');return}
-      S.shadowDone=true;log('새 그림자 끝에 돌을 하나 더 놓았다. 첫 돌이 서쪽, 두 번째 돌이 동쪽. 그 선에 직각으로, 해 반대편이 북쪽이다.');checkNorth()}});
+      S.shadowDone=true;S.stick.t2=S.t;log('새 그림자 끝에 돌을 하나 더 놓았다. 첫 돌이 서쪽, 두 번째 돌이 동쪽. 그 선에 직각으로, 해 반대편이 북쪽이다.');checkNorth()}});
   }
 });
 DAY_HOOKS.global.push(a=>{
@@ -1362,8 +1366,8 @@ function showSky(){
 MONO[6]=()=>{
   let s;
   if(!S.sawSunrise&&S.t<8*60)s='해가 뜨기 전에 북쪽 언덕에 올라 해 뜨는 쪽을 보자.';
-  else if(!S.shadowDone&&!S.stick&&S.t<16*60)s=S.t<9*60?'해가 좀 더 높이 뜨면 쉼터 앞 공터에 막대를 꽂아 그림자로 방향을 찾자.':'쉼터 앞 공터에 막대를 꽂아 그림자로 방향을 찾자.';
-  else if(!S.shadowDone&&S.stick)s=S.t-S.stick.t<30?'그림자 끝이 움직이길 기다리자. 30분쯤.':'그림자가 움직였다. 두 번째 표시를 하자.';
+  else if(!S.shadowDone&&!S.stick&&S.t<16*60)s=S.t<9*60?'해가 좀 더 높이 뜨면 쉼터 앞 공터에 막대를 꽂아 그림자로 방향을 찾자.':'쉼터 앞 공터, 막대가 떨어져 있는 곳에 막대를 꽂아 그림자로 방향을 찾자.';
+  else if(!S.shadowDone&&S.stick)s=S.t-S.stick.t<30?'그림자 끝이 움직이길 기다리자. 30분쯤. 그림자가 조금씩 돌아가는 게 보인다.':'그림자가 움직였다. 두 번째 표시를 하자.';
   else if(!S.foundPolaris)s=S.t>=20*60?(inShelter()?'밖으로 나가 밤하늘을 보자.':'지금이다. 밤하늘을 보자. 북두칠성을 찾자.'):'밤이 되면 하늘을 보자. 북두칠성으로 북극성을 찾을 수 있다.';
   else s='북쪽을 알았다. 언덕 너머, 강 상류 쪽.';
   if(!S.found.routemap&&S.t<18*60&&S.t>=8*60)s+=' 정류장 뒤쪽에 뭔가 남아 있을지도.';
@@ -1377,10 +1381,19 @@ DAY_HOOKS.draw.push(now=>{
   for(let y=-12;y<=12;y++)for(let x=-28;x<=28;x++){const d=(x*x)/(28*28)+(y*y)/(12*12);if(d>1)continue;
     const light=(-x-y*2)/40+(1-d)*.6;const k=Math.floor(light*3+bay(x+400,y+400)*1.2);P(lc,hx+x,hy+y,['#3e4c2c','#4a5c34','#56693c','#647a46'][Math.max(0,Math.min(3,k))])}
   [[-12,2],[8,-3],[15,5]].forEach(([x,y])=>{P(lc,hx+x,hy+y,'#8a867c',3,2);P(lc,hx+x,hy+y,'#a8a49a',2,1)});
-  // shadow stick and marker stones
-  if(S.day===6||S.shadowDone){const sx=235,sy=165;
-    if(S.stick||S.shadowDone){P(lc,sx,sy-8,'#6a4a2c',1,9);const len=S.shadowDone?0:Math.min(6,((S.t-(S.stick?S.stick.t:S.t))/10)|0);P(lc,sx+1,sy,'rgba(0,0,0,.35)',7,1);
-      P(lc,sx+8,sy,'#a8a49a',2,1);if(S.shadowDone){P(lc,sx+2,sy+3,'#a8a49a',2,1);for(let i=0;i<6;i++)P(lc,sx+3+i,sy+2-(i>>2)*0,'rgba(232,168,76,.6)')}}
+  // open ground for the shadow stick: a cleared patch, a stick lying there until it is planted
+  if(S.day===6){const bx=250,by=179;
+    for(let y=-4;y<=4;y++)for(let x=-11;x<=11;x++){if((x*x)/121+(y*y)/16<=1&&bay(x+400,y+400)<.8)P(lc,bx+x,by+y,(x+y)%3?'#6e5f44':'#7a6a4d')}
+    if(!S.stick&&!S.shadowDone){for(let i=0;i<12;i++){P(lc,bx-6+i,by+1-(i>>2),'#a8845a');P(lc,bx-6+i,by+2-(i>>2),'#6a4a2c')}
+      const tw=Math.sin(now/380);if(tw>-.2){P(lc,bx-3,by-4,'#fff6d8');if(tw>.5){P(lc,bx-4,by-4,'#fff6d8');P(lc,bx-2,by-4,'#fff6d8');P(lc,bx-3,by-5,'#fff6d8');P(lc,bx-3,by-3,'#fff6d8')}}}
+  }
+  if(S.day===6&&(S.stick||S.shadowDone)){const bx=STICK.x,by=STICK.y;
+    const t1=S.stick.t,ex=t=>t1+(t-t1)*4,t2=S.shadowDone?S.stick.t2:S.t,a1=stickTip(t1),a2=stickTip(ex(t2));
+    // the live shadow (only while waiting), the stones, and the west-east line once done
+    if(!S.shadowDone){const c=stickTip(ex(S.t));const n=Math.max(Math.abs(c[0]),Math.abs(c[1]));for(let i=1;i<=n;i++){P(lc,bx+c[0]*i/n,by+c[1]*i/n,'rgba(20,24,14,.7)');P(lc,bx+c[0]*i/n+1,by+c[1]*i/n,'rgba(20,24,14,.35)')}}
+    if(S.shadowDone){const dx=a2[0]-a1[0],dy=a2[1]-a1[1],n=Math.max(Math.abs(dx),Math.abs(dy),1);for(let i=0;i<=n;i++)P(lc,bx+a1[0]+dx*i/n,by+a1[1]+dy*i/n,'#e8a84c')}
+    [[a1,'#b8b4aa']].concat(S.shadowDone?[[a2,'#d8d4ca']]:[]).forEach(([a,c])=>{P(lc,bx+a[0]-1,by+a[1]-1,c,3,2);P(lc,bx+a[0]-1,by+a[1]+1,'#5e5a52',3,1)});
+    if(S.shadowDone){P(lc,bx+a1[0]-3,by+a1[1]-6,'#ece4d2');P(lc,bx+a2[0]+2,by+a2[1]-6,'#ece4d2')}
   }
   // compass rose once north is known
   if(S.northKnown){const cx=14,cy=16;P(lc,cx-1,cy-8,'#e8a84c',2,8);P(lc,cx-1,cy,'#8a8476',2,6);P(lc,cx-5,cy,'#8a8476',10,1);
