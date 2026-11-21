@@ -208,17 +208,17 @@ const FINDS=[
   {id:'can',x:300,y:262,icon:'🥫',kind:'use',name:'녹슨 통조림',
    text:'길가 덤불 아래 반쯤 묻혀 있었다. 라벨은 다 지워졌다.\n그래도 먹을 수는 있을 것이다.'},
   {id:'shoe',x:222,y:150,icon:'👟',kind:'mem',name:'작은 운동화',
-   text:'아이 발만 한 운동화 한 짝.\n끈이 한쪽만 묶여 있다. 급하게 신다 만 것처럼.'},
+   text:'아이 발만 한 운동화 한 짝. 끈이 한쪽만 묶여 있다.\n알아본다. 〔형제〕의 운동화다. 그날 정류장에서 급하게 신다 만 그대로.'},
   {id:'letter',x:66,y:165,icon:'✉️',kind:'mem',name:'젖은 편지',
    text:'번진 글씨를 겨우 읽었다.\n\n「수아야, 아빠가 먼저 북쪽 대피소에 가서 자리 잡아 둘게. 엄마 손 꼭 잡고 다음 버스 타. 무서우면 노래 불러. 아빠도 부를게.」'},
   {id:'sign',x:565,y:92,icon:'🚏',kind:'mem',name:'정류장 표지판 조각',
    text:'녹슨 철판에 글자가 남아 있다.\n\n「북쪽 대피소 행 · 막차 18:00」\n\n막차는 왔을까.'},
   {id:'watch',x:92,y:432,icon:'⌚',kind:'mem',name:'멈춘 손목시계',
-   text:'나무뿌리에 감겨 있던 손목시계. 바늘이 4시 17분에 멈춰 있다.\n그날, 이 근방 시계는 모두 그 시간에 멈췄다.\n나도 기억한다. 아니, 기억하는 것 같다.'},
+   text:'나무뿌리에 감겨 있던 손목시계. 바늘이 4시 17분에 멈춰 있다.\n그날, 이 근방 시계는 모두 그 시간에 멈췄다.\n나도 기억한다. 그 시간, 우리는 정류장에서 막차를 기다리고 있었다.'},
   {id:'drawing',x:628,y:405,icon:'🖍️',kind:'mem',name:'크레용 그림',
-   text:'강가 바위 틈, 비닐에 싸인 종이 한 장.\n집과 해, 그리고 사람 셋. 가장 작은 사람 옆에 삐뚤빼뚤 「수아」라고 적혀 있다.'},
+   text:'강가 바위 틈, 비닐에 싸인 종이 한 장.\n집과 해, 그리고 사람 넷. 엄마, 아빠, 그리고 가장 작은 둘 옆에 삐뚤빼뚤 「수아」, 「〔형제〕」.\n내가 그린 그림이다.'},
   {id:'musicbox',x:262,y:452,icon:'🎵',kind:'mem',name:'오르골',
-   text:'흙을 털고 태엽을 감았다.\n몇 음이 흘러나오다 멈췄다.\n처음 듣는 곡인데, 다음 음을 알 것 같았다.'},
+   text:'흙을 털고 태엽을 감았다.\n몇 음이 흘러나오다 멈췄다.\n엄마가 잠들기 전에 감아 주던 오르골. 다음 음을 안다. 엄마가 흥얼거리던 그대로.'},
 ];
 FINDS.push(
   {id:'umbrella',day:2,x:250,y:96,kind:'mem',name:'노란 우산',
@@ -670,18 +670,23 @@ const charSet=()=>CHARS.find(c=>c.id===CHAR)||CHARS[0];
 // the hero's name follows the chosen child (재희 / 재헌); the story text is written with 수아 and rewritten on screen
 const HERO_NAMES={dau:'재희',son:'재헌'};
 const heroName=()=>HERO_NAMES[CHAR]||'재희';
+const sibName=()=>CHAR==='son'?'재희':'재헌';
+const hasB=n=>(n.charCodeAt(n.length-1)-0xAC00)%28!==0;
+const NAME_RE=/수아|〔형제〕/;
 function nameFix(t){
-  const n=heroName();if(n==='수아'||t.indexOf('수아')<0)return t;
-  const b=(n.charCodeAt(n.length-1)-0xAC00)%28!==0,I=b?n+'이':n;
+  if(!NAME_RE.test(t))return t;
+  const n=heroName(),sb=sibName(),sB=hasB(sb);
+  t=t.replace(/〔형제〕(이랑|랑|이|가|은|는|과|와|의|야|아)?/g,(m,j)=>{if(!j)return sb;const J={'이랑':sB?'이랑':'랑','랑':sB?'이랑':'랑','이':sB?'이':'가','가':sB?'이':'가','은':sB?'은':'는','는':sB?'은':'는','과':sB?'과':'와','와':sB?'과':'와','의':'의','야':sB?'아':'야','아':sB?'아':'야'}[j];return sb+J});
+  if(t.indexOf('수아')<0)return t;
+  const b=hasB(n),I=b?n+'이':n;
   return t.replace(/윤수아/g,'윤'+n).replace(/수아야/g,b?n+'아':n+'야').replace(/수아예요/g,b?n+'이에요':n+'예요')
     .replace(/수아(가|는|라는|라고|구나|였다|였)/g,(m,p)=>I+p).replace(/수아/g,n);
 }
 function fixNode(root){
-  if(heroName()==='수아')return;
   const w=document.createTreeWalker(root,NodeFilter.SHOW_TEXT);let x;
-  while((x=w.nextNode())){if(x.nodeValue.indexOf('수아')<0)continue;if(x.parentElement&&x.parentElement.closest('.charlist'))continue;x.nodeValue=nameFix(x.nodeValue)}
+  while((x=w.nextNode())){if(!NAME_RE.test(x.nodeValue))continue;if(x.parentElement&&x.parentElement.closest('.charlist'))continue;x.nodeValue=nameFix(x.nodeValue)}
 }
-new MutationObserver(ms=>{for(const m of ms){if(m.type==='characterData'){const x=m.target;if(x.nodeValue&&x.nodeValue.indexOf('수아')>=0&&!(x.parentElement&&x.parentElement.closest('.charlist')))x.nodeValue=nameFix(x.nodeValue)}else m.addedNodes.forEach(a=>a.nodeType===3?(a.nodeValue.indexOf('수아')>=0&&(a.nodeValue=nameFix(a.nodeValue))):a.nodeType===1&&fixNode(a))}})
+new MutationObserver(ms=>{for(const m of ms){if(m.type==='characterData'){const x=m.target;if(x.nodeValue&&NAME_RE.test(x.nodeValue)&&!(x.parentElement&&x.parentElement.closest('.charlist')))x.nodeValue=nameFix(x.nodeValue)}else m.addedNodes.forEach(a=>a.nodeType===3?(NAME_RE.test(a.nodeValue)&&(a.nodeValue=nameFix(a.nodeValue))):a.nodeType===1&&fixNode(a))}})
   .observe(document.documentElement,{subtree:true,childList:true,characterData:true});
 
 
@@ -1454,7 +1459,7 @@ function radioAnswer(){
 
 잠시 침묵. 그리고 조심스러운 목소리.
 
-「…강가 오두막, 맞습니까? 혹시… 윤수아 씨입니까? 대피소 기록에… 아버님이 매일 이 주파수로 그 이름을 부르셨다고…」
+「…강가 오두막, 맞습니까? 혹시… 윤수아 씨입니까? 대피소에… 아버님이 계십니다. 일 년 동안 매일 저녁 이 주파수로 그 이름을 부르셨습니다…」
 
 손이 떨려 다이얼을 놓칠 뻔했다.
 
@@ -1810,7 +1815,7 @@ INV_EXTRA.push(['stick','마른 가지'],['resin','송진'],['torch','횃불']);
   };
 })();
 FINDS.push({id:'carving',map:'cave',day:10,x:372,y:126,kind:'note',name:'바위벽의 글씨',
-  text:'횃불을 비추자 바위벽에 무언가로 긁어 새긴 글씨가 드러났다.\n\n「수아 — 9월 4일. 아빠 여기 지나감. 위쪽은 숨이 막힌다. 아래쪽 길로.」\n\n50년 전, 아빠도 이 굴을 지났다.'});
+  text:'횃불을 비추자 바위벽에 무언가로 긁어 새긴 글씨가 드러났다.\n\n「수아 — 9월 4일. 아빠 여기 지나감. 위쪽은 숨이 막힌다. 아래쪽 길로.」\n\n작년 9월, 아빠도 이 굴을 지났다. 내가 따라올 줄 알았던 걸까.'});
 ON_START[10]=()=>{applyPack();setMap('cave',40,240);S.torch=0;S.torchLit=false;S.marked=false;S.visitNorth=false;S.lost=false;S.ceiling=false;S.rockHit=false;S.inBadAir=false;S.stickLeft=3;S.resinLeft=3};
 PRESET[10]=()=>{S.packed=true;S.pack=['water','fire','blanket','food','aid','cord'];S.inv.bw='rain';S.inv.dfish=2;S.kitWrapped=true;S.noteLeft=true;S.d9radio=true;S.notes.push(9)};
 DAY_HOOKS.actions.push((o,a)=>{
@@ -2040,7 +2045,7 @@ addIcons({
 });
 INV_EXTRA.push(['moss','이끼'],['charcoal','숯'],['pitch','역청'],['plank','판자'],['paddle','노']);
 FINDS.push({id:'boatname',map:'valley',day:12,x:478,y:250,when:()=>S.boatSeen&&!S.boatUp,kind:'mem',name:'뱃머리의 글씨',
-  text:'뒤집힌 배의 뱃머리, 이끼를 걷어 내자 페인트 글씨가 드러났다.\n\n「수아호」\n\n아빠가 지어 준 이름. 아빠가 만든 배다. 50년 동안 이 강가에서 기다리고 있었다.'});
+  text:'뒤집힌 배의 뱃머리, 이끼를 걷어 내자 페인트 글씨가 드러났다.\n\n「수아호」\n\n아빠가 주말마다 손보던 우리 가족 나룻배. 내 이름을 붙였다며 웃던 얼굴이 떠오른다. 그날 이후 일 년, 이 강가에 뒤집혀 있었다.'});
 ON_START[12]=()=>{if(S.map!=='valley')goValley(172,278);else{S.p={x:172,y:278,face:1,step:0};CAM.snap=true}S.rainLv=0;S.clouds=1;S.holes=[0,0,0];S.boatUp=false;S.boatSeen=false;S.boatReady=false;S.mossLeft=4;S.resinLeft=4;S.charLeft=2;S.ropeLeft=1;S.plankLeft=1};
 PRESET[12]=()=>{S.notes.push(11);S.sky={cirrus:1,halo:1,red:1};S.lean=2};
 DAY_HOOKS.actions.push((o,a)=>{
@@ -2148,7 +2153,7 @@ PRESET[14]=()=>{S.notes.push(13);S.crossed=true;S.crossFord='B';S.boatSecured=tr
 DAY_HOOKS.tick.push(m=>{
   if(S.day!==14||S.map!=='valley')return;
   if(S.ferryT===undefined&&((S.smoke&&S.t>=11.5*60)||S.t>=15*60)){S.ferryT=S.t;emote('!');Sfx.play('discover');log(S.smoke?'하구 쪽에서 작은 배 한 척이 거슬러 올라온다! 연기를 본 것이다.':'오후 늦게, 하구 쪽에서 작은 배 한 척이 거슬러 올라온다. 한참을 찾아 헤맨 모양이다.')}
-  if(S.ferryT!==undefined&&!S.boatArrived&&S.t>=S.ferryT+60){S.boatArrived=true;log('배가 선착장에 닿았다. 두 사람이 내린다. 사람이다. 50년 만에 보는 사람.')}
+  if(S.ferryT!==undefined&&!S.boatArrived&&S.t>=S.ferryT+60){S.boatArrived=true;log('배가 선착장에 닿았다. 두 사람이 내린다. 사람이다. 일 년 만에 보는 사람.')}
   if(S.boatArrived&&Math.hypot(S.p.x-DOCK.x,S.p.y-DOCK.y)<150)once('d14see',()=>{emote('?');log('노인 한 명과 아이 하나. 이쪽을 두리번거린다. 심장이 쿵쿵 뛴다.')});
 });
 DAY_HOOKS.actions.push((o,a)=>{
@@ -2179,11 +2184,11 @@ function meetStranger(){
     choiceCard('살핌','노인이 다가와 묻는다','"어디 다친 데는 없니? 며칠이나 걸어왔어?"',
       [{t:'괜찮다고만 한다',retry:'노인이 고개를 젓는다. "숨기면 도와줄 수가 없단다."'},
        {t:'몸 상태와 지나온 길을 솔직하게 말한다',d:`체력 ${Math.round(S.hp)} · 동굴, 강, 비`}],()=>{
-      const opts=[];if(food)opts.push({t:'남은 먹을 것을 나눈다',d:'말린 생선 한 마리'});if(water)opts.push({t:'물병을 건넨다',d:'끓인 물'});opts.push({t:'수아호를 보여 준다',d:'아빠가 만든 배'});
+      const opts=[];if(food)opts.push({t:'남은 먹을 것을 나눈다',d:'말린 생선 한 마리'});if(water)opts.push({t:'물병을 건넨다',d:'끓인 물'});opts.push({t:'수아호를 보여 준다',d:'아빠가 손보던 우리 집 배'});
       choiceCard('나눔','처음 만난 사람에게','아이가 배고픈 눈으로 쳐다본다. 무엇을 내밀까?',opts,i=>{
         const t=opts[i].t;if(t.startsWith('남은')){if(S.inv.dfish)S.inv.dfish--;else if(S.inv.can)S.inv.can--;else if(S.inv.dand)S.inv.dand--;S.shared='food'}else if(t.startsWith('물병')){S.shared='water'}else S.shared='boat';
         S.met=true;S.mind=clamp100(S.mind+25);emote('♥');Music.musicBox&&Music.musicBox();
-        choiceCard('수아호','노인의 이야기',`${S.shared==='food'?'아이가 생선을 받아 들고 활짝 웃는다. ':S.shared==='water'?'노인이 물을 한 모금 마시고 눈을 감는다. ':''}노인이 강가의 배를 보더니 걸음을 멈춘다.<br><br>"수아호…? 이 배를 어디서… 이건 우리 아버지가 너희 아버지랑 같이 만든 배다. 50년 전, 두 분이 이 강을 오가며 사람들을 날랐지. 아버지는 늘 그러셨어. 언젠가 그 집 아이가 이 강을 건너올 거라고."<br><br>"가자, 수아. 하구에 우리 사람들이 있다. 열두 명. 너까지 열셋이야."`,[{t:'고개를 끄덕인다'}],()=>log('노인이 손을 내민다. 선착장으로 가서 함께 배에 오르자.'),'boatname');
+        choiceCard('수아호','노인의 이야기',`${S.shared==='food'?'아이가 생선을 받아 들고 활짝 웃는다. ':S.shared==='water'?'노인이 물을 한 모금 마시고 눈을 감는다. ':''}노인이 강가의 배를 보더니 걸음을 멈춘다.<br><br>"수아호…? 그럼 네가 윤 씨네 아이구나. 작년 가을, 너희 아빠가 저 배로 강 건너 사람들을 하구까지 실어 날랐다. 그러고는 아이들을 찾겠다며 북쪽으로 떠났지."<br><br>노인이 잠시 말을 고른다.<br><br>"그리고… 하구에 매일 저녁 선착장에 나와 앉아 있는 여자가 있다. 정류장에서 아이 손을 놓쳤다고. 가자, 수아. 확인해 봐야지."`,[{t:'고개를 끄덕인다'}],()=>log('노인이 손을 내민다. 선착장으로 가서 함께 배에 오르자.'),'boatname');
       },'dfish');
     });
   },'radio');
@@ -2370,10 +2375,11 @@ muteBtn.onclick=()=>{Music.start();Music.setOn(!Music.on);muteBtn.textContent=Mu
 const ov=document.getElementById('ov'),card=document.getElementById('ovCard');
 const DAYS={
   1:{theme:'물이 탁해졌다',wake:'눈을 떴다. 목이 마르다.',
-     intro:()=>`<h2>마지막 사람</h2><div class="sub">멸망 후 50년 · 1일차 — 물이 탁해졌다</div>
-  <p>마지막으로 사람 목소리를 들은 게 언제였는지 기억나지 않는다. 도시는 숲이 되었고, 나는 강가의 작은 쉼터에서 하루하루를 지낸다.</p>
+     intro:()=>`<h2>마지막 사람</h2><div class="sub">멸망 후 1년 · 1일차 — 물이 탁해졌다</div>
+  <p>그날로부터 일 년. 마지막으로 사람 목소리를 들은 게 언제였는지 가물가물하다. 거리는 풀과 덩굴에 덮였고, 나는 강가의 작은 쉼터에서 혼자 하루하루를 지낸다.</p>
+  <p>그날 정류장에서 엄마와 〔형제〕의 손을 놓쳤다. 아빠는 먼저 북쪽으로 갔다. 다들 어딘가에 살아 있을 거라고, 매일 밤 생각한다.</p>
   <p>어젯밤 비가 그친 뒤로 강물이 흙빛이다. 마실 물을 구해야 한다.<br>그리고 오늘은, 조금 멀리까지 걸어 볼 생각이다.</p>
-  <p class="small">✦ 반짝이는 곳에는 50년 전의 물건이 있습니다. 가져가서 쉼터에 둘 수도, 그 자리에 둘 수도 있어요.<br>자동차, 빗물통, 덤불, 바위처럼 주변 사물에 다가가면 만져 볼 수 있어요.<br>물을 얻는 방법은 하나가 아닙니다. 위쪽 💭 혼잣말이 넌지시 알려 줍니다.<br>어둡게 가려진 곳은 아직 가 보지 않은 곳입니다. 걸어가면 밝혀져요.<br>이동: WASD·방향키 또는 화면 탭 · 행동: 주인공 옆에 뜨는 메뉴를 누르거나 Space·숫자키 · 먹기·마시기는 배낭의 물건을 눌러서 · ⏸ 일시정지(P) · ☰ 날짜 선택<br>하루는 저절로 끝나지 않아요. 쉼터 잠자리에서 잠들 때 끝납니다.</p>`},
+  <p class="small">✦ 반짝이는 곳에는 그날의 물건이 있습니다. 가져가서 쉼터에 둘 수도, 그 자리에 둘 수도 있어요.<br>자동차, 빗물통, 덤불, 바위처럼 주변 사물에 다가가면 만져 볼 수 있어요.<br>물을 얻는 방법은 하나가 아닙니다. 위쪽 💭 혼잣말이 넌지시 알려 줍니다.<br>어둡게 가려진 곳은 아직 가 보지 않은 곳입니다. 걸어가면 밝혀져요.<br>이동: WASD·방향키 또는 화면 탭 · 행동: 주인공 옆에 뜨는 메뉴를 누르거나 Space·숫자키 · 먹기·마시기는 배낭의 물건을 눌러서 · ⏸ 일시정지(P) · ☰ 날짜 선택<br>하루는 저절로 끝나지 않아요. 쉼터 잠자리에서 잠들 때 끝납니다.</p>`},
   2:{theme:'폭풍이 온다',wake:'눈을 떴다. 바람 소리가 심상치 않다.',
      intro:()=>`<h2>2일차</h2><div class="sub">폭풍이 온다</div>
   <p>아침부터 바람 냄새가 다르다. 하늘 한쪽이 무겁게 내려앉았다.<br>오후 세 시쯤이면 폭풍이 들이닥칠 것이다.</p>
@@ -2421,9 +2427,9 @@ function journal1(forced,home){
   if(has('shoe'))L.push('작은 운동화를 문가에 두었다. 끈 한쪽은 풀린 채로.');
   if(has('watch'))L.push('멈춘 시계를 벽에 걸었다. 4시 17분. 이제 이 방에도 그 시간이 있다.');
   if(has('musicbox'))L.push('오르골을 머리맡에 두었다. 잠들기 전에 한 번 더 감아 볼 생각이다.');
-  if(seen('letter')&&seen('drawing'))L.push('편지와 그림 속 아이의 이름은 수아. 몇 번이고 소리 내어 불러 봤다. 이상하게, 입에 익었다.');
-  else if(seen('letter'))L.push('편지 속 아이의 이름은 수아였다. 아빠는 먼저 북쪽으로 갔다고 했다.');
-  else if(seen('drawing'))L.push('그림 속 가장 작은 사람, 수아. 누구였을까.');
+  if(seen('letter')&&seen('drawing'))L.push('아빠의 편지와 내가 그린 우리 가족 그림. 엄마, 아빠, 〔형제〕. 이름을 하나씩 소리 내어 불러 봤다.');
+  else if(seen('letter'))L.push('아빠의 편지를 찾았다. 아빠는 먼저 북쪽 대피소로 갔다. 엄마 손 꼭 잡으라고 했는데, 나는 그 손을 놓쳤다.');
+  else if(seen('drawing'))L.push('내가 그린 우리 가족 그림. 엄마, 아빠, 〔형제〕, 나. 다들 어디에 있을까.');
   const north=[S.signal&&'라디오',seen('letter')&&'편지',seen('sign')&&'표지판'].filter(Boolean);
   if(north.length>=2)L.push(`${north.join('에도, ')}에도 '북쪽'이 있었다.`);
   else if(seen('sign'))L.push('북쪽 대피소 행 막차, 18시. 막차는 왔을까.');
@@ -2445,7 +2451,7 @@ function journal2(forced,home){
   L.push(S.storedWood?'마른 땔감을 안에 들여놔서 다행이다. 내일 불을 피울 수 있을 것이다.':'땔감이 다 젖었을 것이다. 내일 불 피우기가 걱정이다.');
   if(S.barrelFull)L.push('빗물통이 가득 찼다. 폭풍도 하나는 주고 갔다.');
   if(seen('umbrella'))L.push('노란 우산 안쪽에 적힌 이름, 윤수아. 3학년 2반.');
-  if(seen('newspaper'))L.push('바람에 날아온 신문 조각. 북부 대피소, 수용 초과. 그럼 수아의 아빠는…');
+  if(seen('newspaper'))L.push('바람에 날아온 신문 조각. 북부 대피소, 수용 초과. 그럼 아빠는…');
   if(forced&&!home)L.push('폭풍 속에서 쉼터를 찾느라 한참을 헤맸다.');
   return L;
 }
@@ -2572,8 +2578,8 @@ JOURNAL[7]=(forced,home)=>{
   if(S.answered){
     L.push('그리고 밤, 라디오가 대답했다.');
     L.push('「혹시 윤수아 씨입니까?」');
-    L.push('운동화, 우산, 크레용 그림, 편지. 내 이름이 적혀 있던 물건들. 나는 50년 동안 내 이름을 잊고 살았다.');
-    L.push('아빠는 매일 그 이름을 불렀다고 한다.');
+    L.push('일 년 동안 아무도 내 이름을 불러 주지 않았다.');
+    L.push('아빠가 살아 있다. 매일 저녁 내 이름을 부르고 있었다.');
   }else L.push('라디오는 잡음뿐이었다. 내일 다시 해 보자.');
   return L;
 };
@@ -2581,13 +2587,15 @@ function showEnding(){
   const skills=['식수 만들기','쉼터와 체온','불 피우기','먹을 것 구하기','응급처치','방향 찾기','구조 신호'];
   const mem=FINDS.filter(f=>f.kind==='mem'&&S.found[f.id]).length,total=FINDS.filter(f=>f.kind==='mem').length;
   Music.musicBox();
-  card.innerHTML=`<h2>마지막 사람 · 1부 끝</h2><div class="sub">멸망 후 50년, 일곱 날</div>
+  card.innerHTML=`<h2>마지막 사람 · 1부 끝</h2><div class="sub">멸망 후 1년, 일곱 날</div>
   <div class="paper">${S.answered?
   `강 하구 선착장으로 가는 길은 아직 모른다. 내일은 무너진 산 아래를 지나야 할지도 모르고, 떠밀려 온 배를 고쳐야 할지도 모른다.
 
 하지만 이제 나는 안다. 물을 만들 줄 알고, 불을 피울 줄 알고, 북쪽이 어디인지 안다.
 
-그리고 내 이름이 수아라는 것을.`:
+그리고 아빠가 살아서 나를 부르고 있다는 것을.
+
+엄마와 〔형제〕도, 분명 어딘가에.`:
   `일곱 날을 혼자 버텼다. 물을 만들고, 불을 피우고, 북쪽을 찾았다.
 
 라디오는 아직 대답하지 않았다. 하지만 신호는 내일도 보낼 수 있다.`}</div>
@@ -2649,7 +2657,7 @@ JOURNAL[10]=(forced,home)=>{
   if(S.lost)L.push('갈림길에서 길을 잃고 한참을 헤맸다. 표시 하나면 됐을 텐데.');else if(S.marked)L.push('갈림길에 돌로 화살표를 놓았다. 작은 표시가 길이 된다.');
   if(S.airChecked||S.flags&&S.flags.d10air)L.push('위쪽 굴 끝에서 숨이 막혔다. 횃불이 파랗게 떨렸다. 바로 돌아섰다.');
   if(S.rockHit)L.push('천장에서 떨어진 돌에 어깨를 맞았다. 머리 위를 먼저 봐야 했다.');else if(S.ceiling)L.push('금 간 천장 아래를 벽에 붙어 지났다.');
-  if(S.found.carving)L.push('바위벽에 아빠가 새긴 글씨. 「수아 — 아빠 여기 지나감. 아래쪽 길로.」 50년 전 같은 굴, 같은 갈림길.');
+  if(S.found.carving)L.push('바위벽에 아빠가 새긴 글씨. 「수아 — 아빠 여기 지나감. 아래쪽 길로.」 일 년 전 아빠가 지난 같은 굴, 같은 갈림길.');
   return L;
 };
 DAYS[11]={theme:'하늘을 읽다',wake:'동굴 출구에서 눈을 떴다. 아래로 강 골짜기가 보인다. 하늘은 맑다… 지금은.',
@@ -2676,7 +2684,7 @@ NOTES[12]={title:'나룻배 고치기',body:['나무배의 틈은 이끼나 섬�
   did:()=>[S.boatSeen?'배 살피기':null,(S.holes||[]).some(h=>h)?'역청으로 구멍 막기':null,S.boatReady?'띄워서 확인':null,S.paddle?'노 만들기':null].filter(Boolean).join(' · ')||'아직 못 해 봄'};
 JOURNAL[12]=()=>{
   const L=['12일차.'],open=(S.holes||[0,0,0]).filter(h=>!h).length;
-  if(S.found.boatname)L.push('뒤집힌 배의 뱃머리에 「수아호」라고 쓰여 있었다. 아빠가 만든 배. 50년을 여기서 기다렸다.');
+  if(S.found.boatname)L.push('뒤집힌 배의 뱃머리에 「수아호」라고 쓰여 있었다. 아빠가 손보던 우리 집 배. 일 년을 여기서 기다렸다.');
   L.push(S.boatReady?'송진과 숯으로 역청을 끓여 구멍 세 개를 메웠다. 물에 띄우니 새지 않았다.':open<3?`구멍을 ${3-open}개 메웠다. 아직 다 막지 못했다.`:'배를 고치지 못했다.');
   L.push(S.paddle?'판자를 묶어 노도 하나 만들었다. 내일, 강을 건넌다.':'노가 없다. 맨손으로 저을 수는 없다.');
   return L;
@@ -2701,7 +2709,7 @@ DAYS[14]={theme:'선착장',wake:'동쪽 기슭에서 맞는 아침. 강 하구 
   intro:()=>`<h2>14일차</h2><div class="sub">선착장</div>
   <p>라디오의 목소리가 말했다. 오늘 낮, 하구 선착장으로 배를 보내겠다고. 연기를 올려 달라고.</p>
   <p>오늘은 <b>멀리서 보이는 신호를 올리고, 처음 만나는 사람을 안전하게 만나는 법</b>을 익힌다.</p>
-  <p class="small">50년 만에 사람을 만납니다. 서두르지 마세요.</p>`};
+  <p class="small">일 년 만에 사람을 만납니다. 서두르지 마세요.</p>`};
 NOTES[14]={title:'신호와 만남',body:['낮에는 연기, 밤에는 불빛. 생솔가지나 젖은 풀을 얹으면 흰 연기가 짙게 오른다.','불 세 개를 삼각형으로 놓는 것은 국제적인 조난 신호다.','맑은 날 거울 반사는 수십 리 밖에서도 보인다.','낯선 사람은 먼저 멀리서 지켜본다. 숫자, 손에 든 것, 몸짓.','다가갈 땐 빈손을 보이고 천천히, 먼저 이름을 말한다. 아픈 곳은 숨기지 않는다. 나눌 것이 있으면 나눈다.'],
   did:()=>[(S.signalFires||[]).length?'신호 모닥불':null,(S.signalFires||[]).length>=3?'삼각형 조난 신호':null,S.smoke?'연기 올리기':null,S.watched?'멀리서 지켜보기':null,S.met?'이름 먼저 말하기 · 나누기':null].filter(Boolean).join(' · ')||'아직 못 해 봄'};
 JOURNAL[14]=()=>{
@@ -2711,13 +2719,13 @@ JOURNAL[14]=()=>{
   L.push(S.watched?'바위 뒤에서 먼저 지켜봤다. 노인 한 명, 아이 하나. 무기는 없었다.':'선착장에 노인과 아이가 있었다.');
   L.push('빈손을 보이고 이름을 말했다. "저는 수아예요."');
   L.push(S.shared==='food'?'아이에게 생선을 나눠 주었다. 아이가 웃었다.':S.shared==='water'?'노인에게 물을 건넸다.':'노인에게 수아호를 보여 주었다.');
-  L.push('수아호는 노인의 아버지와 우리 아빠가 함께 만든 배였다. 아빠는 혼자가 아니었다. 그리고 나도.');
+  L.push('노인은 아빠를 알았다. 작년 가을 아빠가 수아호로 사람들을 날랐다고 했다. 그리고 하구에, 매일 저녁 선착장에 나와 앉아 아이를 기다리는 여자가 있다고.');
   return L;
 };
 function showEnding2(){
   const skills=['끈과 매듭','짐 꾸리기','동굴 안전','날씨 읽기','배 고치기','물 건너기','신호와 만남'];
   Music.musicBox();
-  card.innerHTML=`<h2>마지막 사람 · 2부 끝</h2><div class="sub">멸망 후 50년, 열네 날</div>
+  card.innerHTML=`<h2>마지막 사람 · 2부 끝</h2><div class="sub">멸망 후 1년, 열네 날</div>
   <div class="paper">노인의 배가 하구로 미끄러져 간다. 뒤에는 밧줄에 묶인 수아호가 따라온다.
 
 아이가 내 옆에 붙어 앉아 이것저것 묻는다. 동굴은 무서웠는지, 비는 얼마나 왔는지, 배는 어떻게 고쳤는지.
@@ -2726,9 +2734,11 @@ function showEnding2(){
 
 열네 날 동안 익힌 것들. 이제 이 아이에게 가르쳐 줄 수 있다.
 
+하구가 가까워진다. 선착장 끝에 누군가 앉아 있다. 바람에 날리는 머리카락, 낯익은 어깨.
+
 나는 마지막 사람이 아니었다.</div>
   <div class="note"><div class="nh">📖 생존 수첩 — 둘째 주에 익힌 것</div><ul>${skills.map((k,i)=>`<li>${i+8}일차 · ${k} ${S.notes.includes(i+8)?'✓':''}</li>`).join('')}</ul></div>
-  <p class="small">3부 — 하구의 사람들. 준비 중이에요.</p>
+  <p class="small">3부 — 하구에서. 엄마를 찾고, 이제 둘이 함께. 준비 중이에요.</p>
   <div class="btns"><button id="restart" class="ghost">처음부터</button><button id="pick" class="ghost">날짜 선택</button></div>`;
   ov.classList.remove('hide');
   const $=id=>document.getElementById(id);
@@ -2766,7 +2776,7 @@ function presetFor(n){
 function showTitle(fromGame){
   const inGame=fromGame&&S&&!S.ended&&S.running&&ov.classList.contains('hide');
   if(inGame)S.running=false;
-  card.innerHTML=`<h2>마지막 사람</h2><div class="sub">멸망 후 50년 · 하루에 하나씩 배우는 생존</div>
+  card.innerHTML=`<h2>마지막 사람</h2><div class="sub">멸망 후 1년 · 하루에 하나씩 배우는 생존</div>
   <p class="small">날짜를 골라 시작하세요. 1일차부터 하면 전날의 상태가 다음 날로 이어집니다.<br>중간 날짜부터 고르면 '전날을 무난히 보낸' 상태로 시작해요.</p>
   <div class="small" style="margin:4px 0 4px">누구로 살아남을까?</div>
   <div class="charlist">${CHARS.map(c=>`<button data-c="${c.id}" class="${c.id===CHAR?'on':''}"><img src="${c.url}" width="42" height="66" alt=""><span>${c.name}${c.sub?`<small>${c.sub}</small>`:''}</span></button>`).join('')}</div>
