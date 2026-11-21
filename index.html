@@ -1475,6 +1475,71 @@ DAY_HOOKS.draw.push(now=>{
   // mirror flashes
   if(S.flashAt&&performance.now()-S.flashAt<2400&&Math.floor(now/200)%2===0){const x=L(S.p.x)+5,y=L(S.p.y)-14;P(lc,x,y,'#ffffff');P(lc,x-2,y,'#fff8d0');P(lc,x+2,y,'#fff8d0');P(lc,x,y-2,'#fff8d0');P(lc,x,y+2,'#fff8d0')}
 });
+// ===== DAY 8 · 끈이 필요하다 (끈과 매듭) =====
+addIcons({
+  fiber:[['g......','.g..g..','..gg...','..g.g..','.g...g.','g.....g','.......'],{g:'#8aa060'}],
+  cord:[['..ttt..','.t...t.','t..t..t','t.t.t.t','t..t..t','.t...t.','..ttt..'],{t:'#b8945a'}],
+  knotcard:[['ppppppp','pkkpkkp','pk.pk.p','ppppppp','pkkpkkp','p.kp.kp','ppppppp'],{p:'#e8e0cc',k:'#6a4a2c'}],
+});
+INV_EXTRA.push(['fiber','섬유'],['cord','끈']);
+addPOI({id:'vines',day:8,x:66,y:52,r:28,name:'폐허를 덮은 칡덩굴'});
+addPOI({id:'willow',day:8,x:612,y:176,r:28,name:'강가 버드나무'});
+addPOI({id:'hangtree',day:8,x:520,y:150,r:26,name:'쉼터 옆 큰 나무'});
+addPOI({id:'linespot',day:8,x:478,y:252,r:22,name:'쉼터 옆벽'});
+FINDS.push({id:'knotcard',day:8,x:352,y:252,kind:'mem',name:'매듭 연습 카드',
+  text:'쉼터 구석 나무 상자 밑에서 코팅된 카드 한 장을 찾았다. 보이스카우트 매듭 그림이 그려져 있다.\n\n빈칸에 서툰 글씨로 「수아 연습용」.\n그 아래 어른 글씨로 「토끼가 굴에서 나와 나무를 돌아 다시 굴로 — 보우라인」.\n\n손가락이 먼저 기억해 냈다.'});
+
+ON_START[8]=()=>{S.vineLeft=5;S.willowLeft=3;S.knots={};};  // 8 fibers = 4 cords: hang 1 + line 1 + join 2
+PRESET[8]=()=>{S.sigFires=true;S.mirrorDone=true;S.answered=true;S.notes=[1,2,3,4,5,6,7];[[66,52],[612,176]].forEach(([x,y])=>revealOn(S.fog,x,y,10))};
+
+// knot choice: pick the right knot for the job
+const KNOTS={bowline:{name:'보우라인',desc:'당겨도 조여들지 않는 고리를 만든다'},clove:{name:'클로브 히치',desc:'기둥이나 나무에 빠르게 감아 묶는다'},square:{name:'사각 매듭',desc:'같은 굵기의 두 줄을 잇는다'}};
+function knotCard(job,prompt,correct,onOk){
+  S.running=false;
+  const order=Object.keys(KNOTS).sort(()=>Math.random()-.5);
+  card.innerHTML=`<div class="icon">${iconImg('cord',60)}</div><h2>${job}</h2><div class="sub">어떤 매듭이 맞을까?</div>
+  <p>${prompt}</p><div class="daylist" id="kb">${order.map(k=>`<button data-k="${k}"><span><b>${KNOTS[k].name}</b></span><span class="sk">${KNOTS[k].desc}</span></button>`).join('')}</div><p class="small" id="km"></p>`;
+  ov.classList.remove('hide');
+  document.querySelectorAll('#kb button').forEach(b=>b.onclick=()=>{
+    if(b.dataset.k===correct){Sfx.play('pick');ov.classList.add('hide');S.running=true;dirtyUI=true;onOk()}
+    else{Sfx.play('leave');document.getElementById('km').textContent=({bowline:'고리는 생겼지만, 이 일에는 맞지 않는다.',clove:'감아 보니 스르륵 풀려 버린다. 이 일에는 맞지 않는다.',square:'두 줄을 잇는 매듭이다. 지금 필요한 건 그게 아니다.'})[b.dataset.k]}
+  });
+}
+DAY_HOOKS.actions.push((o,a)=>{
+  if(!o||S.day!==8)return;const I=S.inv;S.knots=S.knots||{};
+  if(o.id==='vines')a.push({label:'칡덩굴 걷어 내기',cost:20,ok:(S.vineLeft||0)>0,why:'더 걷을 덩굴이 없다',fn:()=>{S.vineLeft--;I.fiber=(I.fiber||0)+1;log('질긴 칡덩굴을 잡아당겨 걷어 냈다. 껍질을 벗기면 섬유가 나온다. (섬유 +1)')}});
+  if(o.id==='willow')a.push({label:'버드나무 속껍질 벗기기',cost:20,ok:(S.willowLeft||0)>0,why:'더 벗기면 나무가 상한다',fn:()=>{S.willowLeft--;I.fiber=(I.fiber||0)+1;log('죽은 가지에서 겉껍질을 벗기고 안쪽의 하얀 속껍질을 길게 뜯어냈다. (섬유 +1)')}});
+  if(o.id==='shelter')a.push({label:'끈 꼬기 (섬유 2)',cost:30,ok:(I.fiber||0)>=2,why:'섬유가 2개 필요하다',fn:()=>{I.fiber-=2;I.cord=(I.cord||0)+1;S.cordMade=(S.cordMade||0)+1;log(S.cordMade===1?'섬유를 두 가닥으로 나눠 각각 한쪽으로 비틀고, 서로 반대로 감았다. 손을 놓아도 풀리지 않는다! (끈 +1)':'익숙해졌다. 한 줄 더. (끈 +1)')}});
+  if(o.id==='hangtree'&&!S.knots.hang)a.push({label:'식량 자루 나무에 매달기 (끈 1)',cost:20,ok:(I.cord||0)>=1,why:'끈이 필요하다',fn:()=>setTimeout(()=>knotCard('식량 자루 매달기','동물이 못 닿게 식량 자루를 높은 가지에 매달려고 한다. 자루 주둥이에 <b>당겨도 조여들지 않는 고리</b>를 만들어 걸어야 한다.','bowline',()=>{I.cord--;S.knots.hang=true;emote('♥');log('보우라인 고리에 자루를 걸고 끈을 가지 너머로 넘겨 높이 끌어올렸다. 밤에 뭐가 와도 못 닿겠지.')}),30)});
+  if(o.id==='linespot'&&!S.knots.line)a.push({label:'빨랫줄 매기 (끈 1)',cost:20,ok:(I.cord||0)>=1,why:'끈이 필요하다',fn:()=>setTimeout(()=>knotCard('빨랫줄 매기','쉼터 기둥과 옆 나무 사이에 줄을 걸려고 한다. 기둥에 <b>빠르게 감아 묶어야</b> 한다.','clove',()=>{I.cord--;S.knots.line=true;emote('♥');log('기둥에 두 번 감아 끝을 안으로 넣었다. 클로브 히치. 젖은 옷을 널 수 있다.')}),30)});
+  if(o.id==='river'&&!S.knots.join)a.unshift({label:'끈 두 줄 이어 병 매달기 (끈 2)',cost:20,ok:(I.cord||0)>=2&&!!I.bottle,why:!I.bottle?'병이 없다':'끈이 2개 필요하다',fn:()=>setTimeout(()=>knotCard('끈 이어 물 긷기','물살이 센 강 한가운데의 맑은 물을 뜨려면 줄이 길어야 한다. <b>같은 굵기의 두 끈을 이어야</b> 한다.','square',()=>{I.cord-=2;S.knots.join=true;I.bw='rain';emote('!');log('사각 매듭으로 두 끈을 잇고 병을 멀리 던졌다. 흙탕물이 덜한 물살 한가운데에서 비교적 맑은 물을 길었다.')}),30)});
+  if(o.id==='radio'&&S.t>=19*60&&!S.d8radio){a.length=0;a.push({label:'라디오 켜기 (약속한 시간)',cost:20,ok:true,fn:()=>{S.d8radio=true;emote('note',3000);log('「…수아 씨, 들립니까. 매일 저녁 일곱 시, 이 주파수입니다. 선착장까지는 강을 따라 사흘 거리. 준비되면 알려 주세요.」')}})}
+});
+MONO[8]=()=>{
+  const I=S.inv,K=S.knots||{},done=['hang','line','join'].filter(k=>K[k]).length;let s;
+  if(S.t>=19*60&&!S.d8radio)s='저녁 일곱 시다. 라디오를 켜자. 약속한 시간이다.';
+  else if(done===3)s='매듭 세 가지를 다 썼다. 이제 끈 없이는 못 살 것 같다.';
+  else if(!(I.cord>0)&&(I.fiber||0)<2)s='먼 길을 가려면 끈이 필요하다. 폐허의 칡덩굴이나 강가 버드나무 속껍질에서 섬유를 얻자.';
+  else if(!(I.cord>0))s='섬유가 모였다. 쉼터에서 꼬아 끈을 만들자.';
+  else s=`끈이 있다. ${!K.hang?'쉼터 옆 큰 나무에 식량 자루를 매달고, ':''}${!K.line?'쉼터 옆벽에 빨랫줄을 매고, ':''}${!K.join?'강가에서 끈을 이어 물을 긷자.':''}`.replace(/, $/,'.');
+  if(S.carry.length&&S.t<18*60)s+=' 배낭 속 물건은 쉼터에 가져다 두자.';
+  return {s,count:`매듭 — 매달기 ${ck(K.hang)} · 빨랫줄 ${ck(K.line)} · 잇기 ${ck(K.join)} · 끈 ${I.cord||0}`};
+};
+const WILLOW_ST=stackTree(9,888);
+DAY_HOOKS.sprites.push(items=>{
+  if(S.day>=8)items.push({y:L(176)+5,f:()=>putStack(WILLOW_ST,L(612),L(176)+4)});
+  // the food sack hangs in front of the big tree's crown
+  if(S.day>=8&&S.knots&&S.knots.hang)items.push({y:L(130)+6,f:()=>{P(lc,266,48,'#d8b47a',1,16);P(lc,264,64,'#8a6a42',6,7);P(lc,265,64,'#b8945a',4,1);P(lc,264,70,'#5a3e26',6,1);P(lc,266,62,'#5a3e26',2,1)}});
+});
+DAY_HOOKS.draw.push(now=>{
+  if(S.day<8)return;
+  // vines draped over the ruins
+  seed=808;const nv=S.day===8?(S.vineLeft||0)*14:0;for(let i=0;i<nv;i++){const x=24+rnd()*24,y=18+rnd()*14;P(lc,x,y,rnd()<.5?'#4f7a34':'#3e6a2a');if(rnd()<.3)P(lc,x+1,y+1,'#6a9a44')}
+  const K=S.knots||{};
+  // food sack hanging from the big tree
+  // clothesline from the shelter wall
+  if(K.line){for(let i=0;i<22;i++)P(lc,232+i,112+Math.round(Math.sin(i/21*Math.PI)*2),'#b8945a');P(lc,238,113,'#7a8aa0',4,5);P(lc,245,114,'#a04040',3,4)}
+});
 // @@DAY_WORLD@@
 // ---------- loop ----------
 let last=performance.now();
@@ -1736,9 +1801,10 @@ function endDay(forced){
   const placed=S.placedOrder.map(id=>FINDS.find(f=>f.id===id));
   const memCount=FINDS.filter(f=>f.kind==='mem'&&S.found[f.id]&&(f.day||1)<=S.day).length;
   const nx=WEEK.find(w=>w.d===S.day+1);
-  const next=S.day<7
+  const next=S.day!==7&&nx
     ?`<p class="small">내일의 주제 — <b style="color:var(--accent)">${S.day+1}일차: ${nx.theme}</b>${nx.ready?'':' (아직 준비 중)'}</p><div class="btns">${nx.ready?`<button id="next">${S.day+1}일차로 넘어가기</button>`:''}<button id="again" class="ghost">${S.day}일차 다시 하기</button><button id="pick" class="ghost">날짜 선택</button></div>`
-    :`<div class="btns"><button id="ending">이야기의 끝으로</button><button id="again" class="ghost">7일차 다시 하기</button><button id="pick" class="ghost">날짜 선택</button></div>`;
+    :S.day===7?`<div class="btns"><button id="ending">1부의 끝으로</button><button id="again" class="ghost">7일차 다시 하기</button><button id="pick" class="ghost">날짜 선택</button></div>`
+    :`<p class="small">여기까지 만들었어요. 다음 이야기는 준비 중이에요.</p><div class="btns"><button id="again" class="ghost">${S.day}일차 다시 하기</button><button id="pick" class="ghost">날짜 선택</button></div>`;
   card.innerHTML=`<h2>밤 — 생존 일지</h2><div class="sub">${S.day}일차 · 발견한 기억 ${memCount}/${memTotal()}</div>
   <div class="paper">${L.map(l=>`<p>${l}</p>`).join('')}</div>
   <div class="note"><div class="nh">📖 생존 수첩 ${S.day}쪽 — ${N.title}</div><ul>${N.body.map(b=>`<li>${b}</li>`).join('')}</ul><div class="did">오늘 직접 해 본 것: ${N.did()}</div></div>
@@ -1865,12 +1931,29 @@ function showEnding(){
 
 라디오는 아직 대답하지 않았다. 하지만 신호는 내일도 보낼 수 있다.`}</div>
   <div class="note"><div class="nh">📖 생존 수첩 — 일주일 동안 익힌 것</div><ul>${skills.map((k,i)=>`<li>${i+1}일차 · ${k} ${S.notes.includes(i+1)?'✓':''}</li>`).join('')}</ul><div class="did">찾은 기억 ${mem}/${total} · 탐험 ${explorePct()}%</div></div>
-  <p class="small">다음 이야기 — 무너진 산의 동굴, 강 하구의 배 (준비 중)</p>
-  <div class="btns">${S.answered?'':'<button id="again">7일차 다시 하기</button>'}<button id="restart" class="ghost">처음부터</button><button id="pick" class="ghost">날짜 선택</button></div>`;
+  <p class="small">2부 — 강 하구로. 끈을 꼬고, 짐을 꾸리고, 무너진 산과 강을 지나 선착장까지.</p>
+  <div class="btns">${WEEK.find(w=>w.d===8&&w.ready)?'<button id="w2">2주차 시작하기</button>':''}${S.answered?'':'<button id="again" class="ghost">7일차 다시 하기</button>'}<button id="restart" class="ghost">처음부터</button><button id="pick" class="ghost">날짜 선택</button></div>`;
   ov.classList.remove('hide');
   const $=id=>document.getElementById(id);
   if($('again'))$('again').onclick=retryDay;$('restart').onclick=()=>startDay(1);$('pick').onclick=()=>showTitle(false);
+  if($('w2'))$('w2').onclick=()=>startDay(8);
 }
+DAYS[8]={theme:'끈이 필요하다',wake:'눈을 떴다. 어젯밤 라디오 목소리가 아직 귓가에 남아 있다.',
+  intro:()=>`<h2>8일차 · 2주차 시작</h2><div class="sub">끈이 필요하다</div>
+  <p>강 하구 선착장. 그곳까지 가야 한다. 짐을 묶고, 배를 엮고, 물을 건너려면 무엇보다 <b>끈</b>이 필요하다.</p>
+  <p>오늘은 <b>풀과 나무껍질로 끈을 만들고, 일에 맞는 매듭을 고르는 법</b>을 익힌다.</p>
+  <p class="small">폐허를 덮은 칡덩굴과 강가 버드나무에서 섬유를 얻을 수 있어요.<br>매듭마다 쓰임이 다릅니다. 일에 맞는 매듭을 골라 보세요.<br>그리고 저녁 일곱 시, 라디오를 잊지 마세요.</p>`};
+NOTES[8]={title:'끈과 매듭',body:['칡 같은 덩굴, 버드나무 속껍질처럼 질긴 식물 섬유로 끈을 만든다.','두 가닥을 각각 한쪽으로 비틀고, 서로는 반대 방향으로 감으면 풀리지 않는 끈이 된다.','보우라인: 당겨도 조여들지 않는 고리. 짐을 매달거나 몸에 두를 때.','클로브 히치: 기둥이나 나무에 빠르게 감아 묶을 때.','사각 매듭: 같은 굵기의 두 줄을 이을 때. 무거운 짐을 매다는 데는 쓰지 않는다.','식량은 나무에 높이 매달아 동물에게서 지킨다.'],
+  did:()=>{const K=S.knots||{};return [S.cordMade?`끈 꼬기 ${S.cordMade}줄`:null,K.hang?'보우라인':null,K.line?'클로브 히치':null,K.join?'사각 매듭':null].filter(Boolean).join(' · ')||'아직 못 해 봄'}};
+JOURNAL[8]=(forced,home)=>{
+  const K=S.knots||{},L=['8일차.'];
+  L.push(S.cordMade?`풀과 나무껍질로 끈을 ${S.cordMade}줄 꼬았다. 처음엔 자꾸 풀렸는데, 반대로 감는 요령을 알고 나니 단단해졌다.`:'끈을 만들지 못했다. 섬유가 손에서 자꾸 흩어졌다.');
+  const k=[K.hang&&'식량 자루를 나무에 매달았고',K.line&&'빨랫줄을 맸고',K.join&&'끈을 이어 강 한가운데 물을 길었다'].filter(Boolean);
+  if(k.length)L.push(k.join(', ')+'.');
+  if(S.found.knotcard)L.push('상자 밑 매듭 카드. 「수아 연습용」. 토끼가 굴에서 나와 나무를 돌아 다시 굴로. 아빠 목소리로 들렸다.');
+  L.push(S.d8radio?'저녁 일곱 시, 라디오. 선착장까지 강을 따라 사흘 거리.':'라디오 시간을 놓쳤다. 내일은 꼭.');
+  return L;
+};
 // @@DAY_SCREENS@@
 const WEEK=[
   {d:1,theme:'물이 탁해졌다',skill:'식수 만들기',ready:true},
@@ -1880,6 +1963,13 @@ const WEEK=[
   {d:5,theme:'다쳤다',skill:'응급처치',ready:true},
   {d:6,theme:'북쪽은 어디일까',skill:'방향 찾기',ready:true},
   {d:7,theme:'누군가에게',skill:'구조 신호 보내기',ready:true},
+  {d:8,theme:'끈이 필요하다',skill:'끈과 매듭',w:2,ready:true},
+  {d:9,theme:'짐을 꾸리다',skill:'장거리 이동 준비',w:2},
+  {d:10,theme:'산이 무너졌다',skill:'동굴 안전',w:2},
+  {d:11,theme:'하늘을 읽다',skill:'날씨 예측',w:2},
+  {d:12,theme:'배를 엮다',skill:'뗏목·배 수리',w:2},
+  {d:13,theme:'물을 건너다',skill:'물가 안전',w:2},
+  {d:14,theme:'선착장',skill:'낯선 사람과 만나기',w:2},
 ];
 // a reasonable "yesterday" for starting a later day directly
 function presetFor(n){
