@@ -657,14 +657,30 @@ const CHARS=[
    pal:{o:'#1c1714',h:'#1e1c22',H:'#3a3842',s:'#e8c4a0',S:'#c99c78',e:'#1e1a16',g:'#b08a50',b:'#2a2a2e',B:'#1c1c20',w:'#e8e8e0',p:'#4a3d30',q:'#33291f',t:'#2e3440',T:'#22262e',k:'#1a1a1e'}},
   {id:'mom',name:'엄마',top:['....ooooo.....','...ohhhhho....','..ohhhHhhho...','..ohhhhhhhho..','.ohhhsssssho..','.ohhsssesSho..','.ohhssssSSho..','.ohhosSSohho..','.ohhmmmmmmhho.','.oqhmmmmmmMho.','opqmmymmmmMo..','opqmmmymmmMo..','opqmmmmmmMMo..','opqmmmmmmMMo..','.oqmmmmmmMMo..','..ommmmmmmMo..','..oMmmmmmMMo..'],
    pal:{o:'#1c1714',h:'#1e1c22',H:'#4a4652',s:'#ecc8a6',S:'#cba07c',e:'#1e1a16',m:'#a8dcc8',M:'#7fbfa8',y:'#e8d8a0',p:'#4a3d30',q:'#33291f',t:'#3a3a44',T:'#2a2a32',k:'#1e1c22'}},
-  {id:'son',name:'아들',top:['...oooooo.....','..ohhhhhho....','..ohhhhhhHo...','..ohhhhhhHo...','..ohssssssSo..','.osssgvgssSo..','.osssssssSSo..','..osssssSSo...','...oossSoo....','..onnnnnnno...','.opcrcCcclCo..','opqclrlcCclo..','opqcClrcclCo..','opqlccCrcCCo..','.oqcCccCrcCo..','..olccClcrCo..','..oCcllcCCro..'],
+  {id:'son',name:'재헌',sub:'아들',top:['...oooooo.....','..ohhhhhho....','..ohhhhhhHo...','..ohhhhhhHo...','..ohssssssSo..','.osssgvgssSo..','.osssssssSSo..','..osssssSSo...','...oossSoo....','..onnnnnnno...','.opcrcCcclCo..','opqclrlcCclo..','opqcClrcclCo..','opqlccCrcCCo..','.oqcCccCrcCo..','..olccClcrCo..','..oCcllcCCro..'],
    pal:{o:'#1c1714',h:'#1e1c22',H:'#3a3842',s:'#ecc6a0',S:'#cc9e78',e:'#1e1a16',g:'#c8c8d0',v:'#9a80d0',n:'#1e1e24',c:'#5a8ac8',C:'#3a62a8',l:'#b8d4f0',r:'#c83a3a',p:'#4a3d30',q:'#33291f',t:'#2e3440',T:'#22262e',k:'#2a2a30'}},
-  {id:'dau',name:'딸',top:['.....oo.......','....ohho......','...owwwo......','...ohhhhho....','..ohhhhhhho...','..ohhhhhhHo...','..oHhhsssSo...','..oHssgegSo...','..oHssssSSo...','...oosSSoo....','..obbbbbbBo...','.oqbbbbbbBBo..','opqbbbbbbbBo..','opqbbbbbbBBo..','opqbbbbbbBBo..','.oqbbbbbbBBo..','..obbbbbbbBo..'],
+  {id:'dau',name:'재희',sub:'딸',top:['.....oo.......','....ohho......','...owwwo......','...ohhhhho....','..ohhhhhhho...','..ohhhhhhHo...','..oHhhsssSo...','..oHssgegSo...','..oHssssSSo...','...oosSSoo....','..obbbbbbBo...','.oqbbbbbbBBo..','opqbbbbbbbBo..','opqbbbbbbBBo..','opqbbbbbbBBo..','.oqbbbbbbBBo..','..obbbbbbbBo..'],
    pal:{o:'#1c1714',h:'#1e1c22',H:'#3a3842',w:'#f0ece0',s:'#eec8a4',S:'#cea07a',e:'#1e1a16',g:'#d8dce4',b:'#2a2a30',B:'#1c1c22',p:'#4a3d30',q:'#33291f',t:'#2a2a30',T:'#1e1e24',k:'#c83a3a'}},
 ];
 CHARS.forEach(c=>{const f=[LEGS_A,LEGS_B,LEGS_C].map(L2=>sprite(c.top.concat(L2),c.pal));c.f=f;c.fl=f.map(flipped);c.url=dataURL(f[0])});
 let CHAR=(()=>{try{return localStorage.getItem('ls_char')||'sua'}catch(e){return 'sua'}})();
 const charSet=()=>CHARS.find(c=>c.id===CHAR)||CHARS[0];
+// the hero's name follows the chosen child (재희 / 재헌); the story text is written with 수아 and rewritten on screen
+const HERO_NAMES={sua:'수아',dau:'재희',son:'재헌'};
+const heroName=()=>HERO_NAMES[CHAR]||'수아';
+function nameFix(t){
+  const n=heroName();if(n==='수아'||t.indexOf('수아')<0)return t;
+  const b=(n.charCodeAt(n.length-1)-0xAC00)%28!==0,I=b?n+'이':n;
+  return t.replace(/이수아/g,'이'+n).replace(/수아야/g,b?n+'아':n+'야').replace(/수아예요/g,b?n+'이에요':n+'예요')
+    .replace(/수아(가|는|라는|라고|구나|였다|였)/g,(m,p)=>I+p).replace(/수아/g,n);
+}
+function fixNode(root){
+  if(heroName()==='수아')return;
+  const w=document.createTreeWalker(root,NodeFilter.SHOW_TEXT);let x;
+  while((x=w.nextNode())){if(x.nodeValue.indexOf('수아')<0)continue;if(x.parentElement&&x.parentElement.closest('.charlist'))continue;x.nodeValue=nameFix(x.nodeValue)}
+}
+new MutationObserver(ms=>{for(const m of ms){if(m.type==='characterData'){const x=m.target;if(x.nodeValue&&x.nodeValue.indexOf('수아')>=0&&!(x.parentElement&&x.parentElement.closest('.charlist')))x.nodeValue=nameFix(x.nodeValue)}else m.addedNodes.forEach(a=>a.nodeType===3?(a.nodeValue.indexOf('수아')>=0&&(a.nodeValue=nameFix(a.nodeValue))):a.nodeType===1&&fixNode(a))}})
+  .observe(document.documentElement,{subtree:true,childList:true,characterData:true});
 
 
 // --- item icons (7x7) ---
