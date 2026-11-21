@@ -226,7 +226,7 @@ FINDS.push(
   {id:'newspaper',day:2,at:17*60,x:452,y:318,kind:'mem',name:'날아온 신문 조각',
    text:'폭풍에 날려 와 쉼터 앞에 들러붙은 신문 조각. 젖어서 글자가 반쯤 지워졌다.\n\n「…북부 대피소 수용 인원 초과… 도착하지 못한 시민은 각 지역 임시 거처에서 구조를 기다리…」\n\n날짜는 그날의 다음 날이다.'}
 );
-const visible=f=>(f.day||1)<=S.day&&(!f.only||f.only.includes(S.day))&&(!f.at||S.t>=f.at);
+const visible=f=>(f.map||'home')===(S.map||'home')&&(f.day||1)<=S.day&&(!f.only||f.only.includes(S.day))&&(!f.at||S.t>=f.at);
 const memTotal=()=>FINDS.filter(f=>f.kind==='mem'&&(f.day||1)<=S.day).length;
 
 // ---------- state ----------
@@ -260,6 +260,7 @@ const POI=[
   {id:'shelter',day:2,x:400,y:246,r:22,name:'쉼터 안'},
 ];
 function nearPOI(){
+  if(S.map&&S.map!=='home')return nearPOIMap();
   const p=S.p;
   // undiscovered things take priority
   for(const f of FINDS){if(!S.found[f.id]&&visible(f)&&Math.hypot(p.x-f.x,p.y-f.y)<34)return{id:'find',find:f,name:'무언가 있다'}}
@@ -268,7 +269,7 @@ function nearPOI(){
   for(const o of POI){if(o.id==='river'||(o.day||1)>S.day||(o.only&&!o.only.includes(S.day)))continue;const d=Math.hypot(p.x-o.x,p.y-o.y);if(d<o.r&&d<bd){bd=d;best=o}}
   return best;
 }
-const inShelter=()=>S.p.x>338&&S.p.x<462&&S.p.y>184&&S.p.y<268;
+const inShelter=()=>(S.map&&S.map!=='home')?!!(MAPS[S.map].inShelter&&MAPS[S.map].inShelter(S.p)):(S.p.x>338&&S.p.x<462&&S.p.y>184&&S.p.y<268);
 
 function actionsFor(o){
   const I=S.inv,a=[];
@@ -387,6 +388,7 @@ function showFind(f){
   if(c2)c2.onclick=()=>{Sfx.play('leave');S.found[f.id]='left';S.mind=Math.min(100,S.mind+2);log(`${f.name}은(는) 그 자리에 두었다. 여기가 그것의 자리 같았다.`);close('…')};
 }
 function placeCarried(){
+  if(S.map&&S.map!=='home')return;
   if(!S.carry.length)return;
   Sfx.play('place');
   for(const id of S.carry){
@@ -399,7 +401,7 @@ function placeCarried(){
 }
 
 // ---------- weather ----------
-function stormLevel(){if(!S||S.day!==2)return 0;const h=S.t/60;if(h<15)return 0;if(h<16)return h-15;if(h<20)return 1;return Math.max(.6,1-(h-20)*.4)}
+function stormLevel(){if(S&&S.day>=10)return S.rainLv||0;if(!S||S.day!==2)return 0;const h=S.t/60;if(h<15)return 0;if(h<16)return h-15;if(h<20)return 1;return Math.max(.6,1-(h-20)*.4)}
 function cloudLevel(){if(!S||S.day!==2)return 0;return Math.max(0,Math.min(1,(S.t/60-10)/5))}
 
 // ---------- time & stats ----------
@@ -624,7 +626,8 @@ const AREAS=[
 function updateFog(){
   if(!S.fog)S.fog=newFog();
   revealOn(S.fog,S.p.x,S.p.y,12);
-  for(const a of AREAS){if(!S.seenAreas[a.id]&&fogAt(a.x,a.y)>=12){S.seenAreas[a.id]=1;log(a.msg);Sfx.play('discover');emote('!')}}
+  const AR=(S.map&&S.map!=='home')?(MAPS[S.map].areas||[]):AREAS;
+  for(const a of AR){if(!S.seenAreas[a.id]&&fogAt(a.x,a.y)>=12){S.seenAreas[a.id]=1;log(a.msg);Sfx.play('discover');emote('!')}}
 }
 
 function sprite(rows,pal){
@@ -930,7 +933,7 @@ const WIND=.28; // horizontal drift per pixel of fall (drops fall down and sligh
 const RAIN=(()=>{seed=1234;const a=[];for(let i=0;i<520;i++){const near=rnd()<.35;a.push({x0:rnd()*(LW+80),y0:rnd()*(LH+30),spd:near?.30+rnd()*.06:.17+rnd()*.05,len:near?6+(rnd()*2|0):3+(rnd()*2|0),near})}return a})();
 const hash=n=>{n=(n^61)^(n>>>16);n=(n+(n<<3))|0;n=n^(n>>>4);n=Math.imul(n,0x27d4eb2d);n=n^(n>>>15);return (n>>>0)/4294967296};
 function drawRain(now,st){
-  const n=(RAIN.length*Math.min(1,st))|0,roof=S.prep.roof;
+  const n=(RAIN.length*Math.min(1,st))|0,roof=S.prep.roof&&!(S.map&&S.map!=='home');
   for(let i=0;i<n;i++){const r=RAIN[i],fall=now*r.spd;
     const y=((r.y0+fall)%(LH+30))-15,x=(((r.x0-fall*WIND)%(LW+80))+(LW+80))%(LW+80)-40;
     if(roof&&x>SH.x0&&x<SH.x0+SH.w&&y>SH.y0&&y<SH.y0+SH.h)continue;
@@ -951,6 +954,7 @@ const SHELF=[[194,96],[202,96],[193,113],[201,113],[185,121],[212,124],[220,124]
 const drawAt=(img,wx,wy)=>lc.drawImage(img,Math.round(L(wx)-img.width/2),Math.round(L(wy)-img.height));
 
 function draw(now){
+  if(S.map&&S.map!=='home'){drawOther(now);return}
   lc.drawImage(bg,0,0);
   // river ripples
   for(let i=0;i<34;i++){const y=(((now/70)+i*7)%250|0)-5,x=340+((i*11)%56);lc.fillStyle=i%3?'#8e7a52':'#a08a60';px(lc,x,y,2+(i%3),1)}
@@ -1612,6 +1616,227 @@ DAY_HOOKS.draw.push(now=>{
   if(S.noteLeft){P(lc,206,126,'#f0ece0',5,4);P(lc,207,127,'#5a5a6a',3,1);P(lc,207,129,'#5a5a6a',2,1)}
   if(S.packed){P(lc,226,112,'#4a3d30',6,7);P(lc,227,113,'#6a5642',4,2);P(lc,227,116,'#33291f',4,1)}
 });
+// ========== MAP SYSTEM: more maps beyond the home valley (week 2) ==========
+// Each map: bg canvas, walk(x,y) mask, pois, areas, labels, items() for depth-sorted sprites,
+// drawGround(now), lights(now), dark (cave), nearWater(p), inShelter(p).
+const MAPS={};
+const curMap=()=>(S&&S.map&&S.map!=='home')?MAPS[S.map]:null;
+function setMap(id,x,y){
+  S.fogs=S.fogs||{};S.fogs[S.map||'home']=S.fog;
+  S.map=id;S.fog=S.fogs[id]||(()=>{const f=new Array(FW*FH).fill(0);revealOn(f,x,y,12);return f})();
+  S.p={x,y,face:1,step:0};S.target=null;CAM.snap=true;S.fire=false;S.fireWeak=null;S.firePos=null;
+}
+// walk mask on a 4-world-px grid, painted from shapes
+function makeMask(shapes,base=0){
+  const G=new Uint8Array(200*120).fill(base);
+  for(const s of shapes){
+    for(let gy=0;gy<120;gy++)for(let gx=0;gx<200;gx++){const x=gx*4+2,y=gy*4+2;let inside=false;
+      if(s.e){const dx=(x-s.e[0])/s.e[2],dy=(y-s.e[1])/s.e[3];inside=dx*dx+dy*dy<=1}
+      else if(s.c){const [x1,y1,x2,y2,r]=s.c,vx=x2-x1,vy=y2-y1,t=Math.max(0,Math.min(1,((x-x1)*vx+(y-y1)*vy)/(vx*vx+vy*vy))),px2=x1+vx*t,py2=y1+vy*t;inside=Math.hypot(x-px2,y-py2)<=r}
+      else if(s.f)inside=s.f(x,y);
+      if(inside)G[gy*200+gx]=s.v===undefined?1:s.v}}
+  return G;
+}
+const maskAt=(G,x,y)=>{const gx=x/4|0,gy=y/4|0;return gx>=0&&gy>=0&&gx<200&&gy<120?G[gy*200+gx]:0};
+function collideMap(M,p,ox,oy){
+  const ok=(x,y)=>x>12&&y>18&&x<W-12&&y<H-12&&M.walk(x,y)&&M.walk(x,y+8);
+  if(ok(p.x,p.y))return;
+  if(ok(p.x,oy)){p.y=oy;return}if(ok(ox,p.y)){p.x=ox;return}
+  p.x=ox;p.y=oy;if(S.target)S.target=null;
+}
+function nearPOIMap(){
+  const M=curMap(),p=S.p;
+  for(const f of FINDS){if(!S.found[f.id]&&visible(f)&&Math.hypot(p.x-f.x,p.y-f.y)<34)return{id:'find',find:f,name:'무언가 있다'}}
+  let best=null,bd=1e9;
+  for(const o of M.pois){if((o.day||1)>S.day||(o.only&&!o.only.includes(S.day))||(o.when&&!o.when()))continue;const d=Math.hypot(p.x-o.x,p.y-o.y);if(d<o.r&&d<bd){bd=d;best=o}}
+  if(best)return best;
+  if(M.nearWater&&M.nearWater(p))return {id:'river',x:p.x,y:p.y,r:0,name:'물가'};
+  return null;
+}
+// ---- shared pieces of the frame for other maps ----
+function darkPass(a,lights){
+  const d=dimg.data;
+  for(let y=0;y<LH;y++)for(let x=0;x<LW;x++){
+    let v=a,warm=0;
+    for(let k=0;k<lights.length;k++){const Lt=lights[k],dx=x-Lt[0],dy=y-Lt[1],dd=(dx*dx+dy*dy)/(Lt[2]*Lt[2]);if(dd<1){v*=Math.sqrt(dd);if(Lt[3])warm=Math.max(warm,1-dd)}}
+    const b2=BAYER[(y&3)*4+(x&3)],lv=Math.min(4,Math.floor(v*4+b2/16)),i=(y*LW+x)*4;
+    if(lv===0&&warm>.15&&a>.2&&b2<warm*10){d[i]=255;d[i+1]=150;d[i+2]=60;d[i+3]=38}else{d[i]=8;d[i+1]=10;d[i+2]=22;d[i+3]=lv===4?236:lv*50}
+  }
+  dctx.putImageData(dimg,0,0);lc.drawImage(dark,0,0);
+}
+function fogPass(){
+  const d=fimg.data,F=S.fog;
+  for(let y=0;y<LH;y++){const row=(y>>2)*FW;for(let x=0;x<LW;x++){const v=F[row+(x>>2)],i=(y*LW+x)*4;if(v>=15){d[i+3]=0;continue}
+    const lv=Math.min(4,Math.floor((1-v/15)*4+BAYER[(y&3)*4+(x&3)]/16));d[i]=13;d[i+1]=12;d[i+2]=18;d[i+3]=lv===4?250:lv*58}}
+  fctx.putImageData(fimg,0,0);lc.drawImage(fogCv,0,0);
+}
+function drawFlames(cx,cy,now){
+  const gr=lc.createRadialGradient(cx,cy-3,0,cx,cy-3,26);gr.addColorStop(0,`rgba(255,170,70,${.26+.04*Math.sin(now/90)})`);gr.addColorStop(1,'rgba(255,140,40,0)');lc.fillStyle=gr;lc.fillRect(cx-28,cy-30,56,56);
+  seed=(now/100|0)*7+3;[3,6,9,11,9,6,3].forEach((h,i)=>{const hh=h+(rnd()*3|0)-1;for(let k=0;k<hh;k++){const f=k/hh;P(lc,cx-3+i,cy-1-k,f<.25?'#b8361e':f<.5?'#e05a22':f<.75?'#f29a30':f<.92?'#f8c850':'#fff0b0')}});
+}
+const STONE_RING=STONES_ST;
+function drawOther(now){
+  const M=curMap(),p=S.p;
+  lc.drawImage(M.bg,0,0);
+  M.drawGround&&M.drawGround(now);
+  // campfires on this map
+  (M.pois.filter(o=>o.id==='fire'&&(!o.only||o.only.includes(S.day)))).forEach(o=>{putStack(STONE_RING,L(o.x),L(o.y));if(S.fire&&S.firePos===o.key)drawFlames(L(o.x),L(o.y),now)});
+  // depth-sorted sprites + hero
+  const walking=S._walk,fr=walking?[0,1,0,2][Math.floor(p.step)%4]:0,cs=charSet(),ps=(p.face>0?cs.f:cs.fl)[fr],bob=!walking&&Math.sin(now/600)>0.4?1:0;
+  const items=M.items?M.items(now):[];
+  items.push({y:L(p.y)+11,f:()=>{lc.fillStyle='rgba(8,10,6,.45)';lc.beginPath();lc.ellipse(L(p.x)+1,L(p.y)+11,6,2,0,0,7);lc.fill();lc.drawImage(ps,Math.round(L(p.x)-7),Math.round(L(p.y)-10)+bob,14,22-bob)}});
+  items.sort((a,b)=>a.y-b.y).forEach(o=>o.f());
+  M.drawTop&&M.drawTop(now);
+  // weather
+  const st=stormLevel();
+  if(st>0){lc.fillStyle=`rgba(40,46,60,${st*.25})`;lc.fillRect(0,0,LW,LH);drawRain(now,st)}
+  if(S.target){lc.fillStyle='rgba(255,255,255,.65)';const tx=Math.round(L(S.target.x)),ty=Math.round(L(S.target.y));[[-2,-2],[-1,-1],[1,1],[2,2],[-2,2],[-1,1],[1,-1],[2,-2]].forEach(([a,b])=>px(lc,tx+a,ty+b))}
+  // light
+  const h=S.t/60;let a=0;
+  if(M.dark)a=typeof M.dark==='function'?M.dark():M.dark;else{if(h<7)a=.45*(7-h);if(h>=16&&h<18.5){lc.fillStyle=`rgba(230,120,50,${(h-16)/2.5*.18})`;lc.fillRect(0,0,LW,LH)}if(h>=17.5)a=Math.min(.8,(h-17.5)/3.5*.8);a=Math.max(a,st*.42)}
+  if(a>0){const lights=[[L(p.x),L(p.y),M.heroLight?M.heroLight(now):28,0]].concat(M.lights?M.lights(now):[]);
+    M.pois.forEach(o=>{if(o.id==='fire'&&S.fire&&S.firePos===o.key)lights.push([L(o.x),L(o.y)-2,76+Math.sin(now/120)*2,1])});
+    darkPass(a,lights)}
+  if(st>.6&&now-S.flash>2500&&Math.random()<.004){S.flash=now;Music.thunder()}
+  if(now-S.flash<90||(now-S.flash>160&&now-S.flash<210)){lc.fillStyle='rgba(235,240,255,.55)';lc.fillRect(0,0,LW,LH)}
+  fogPass();
+  FINDS.forEach((f,i)=>{if(S.found[f.id]||!visible(f)||fogAt(f.x,f.y)<8)return;const tw=Math.sin(now/380+i*1.7),x=Math.round(L(f.x)),y=Math.round(L(f.y));
+    P(lc,x,y,tw>-.3?'#fff6d8':'#b8ae90');if(tw>-.2){lc.fillStyle='rgba(255,246,216,.8)';px(lc,x-1,y);px(lc,x+1,y);px(lc,x,y-1);px(lc,x,y+1)}if(tw>.4){lc.fillStyle='rgba(255,246,216,.5)';px(lc,x-2,y);px(lc,x+2,y);px(lc,x,y-2);px(lc,x,y+2)}});
+  const o=nearPOI();
+  if(o&&Math.floor(now/350)%2===0){let cx,cy,s;if(o.find){cx=L(o.find.x);cy=L(o.find.y);s=7}else{cx=L(o.x);cy=L(o.y);s=(o.r||20)>40?18:12}
+    cx=Math.round(cx);cy=Math.round(cy);lc.fillStyle='#e8a84c';[[-1,-1],[1,-1],[-1,1],[1,1]].forEach(([sx,sy])=>{const x0=cx+sx*s,y0=cy+sy*s;px(lc,x0,y0);px(lc,x0-sx,y0);px(lc,x0-sx*2,y0);px(lc,x0,y0-sy);px(lc,x0,y0-sy*2)})}
+  if(S.emote&&now<S.emote.until&&EMO[S.emote.type]){const age=now-S.emote.at,lift=age<120?2:0,fade=S.emote.until-now<250;if(!fade||Math.floor(now/60)%2===0)lc.drawImage(EMO[S.emote.type],Math.round(L(p.x)-2),Math.round(L(p.y)-25)+lift+bob)}
+  updateCam();ctx.imageSmoothingEnabled=false;ctx.drawImage(low,CAM.dx/2,CAM.dy/2,CAM.vw/2,CAM.vh/2,0,0,CAM.cw,CAM.ch);
+  ctx.font='bold 11px system-ui,sans-serif';ctx.textAlign='center';
+  (M.labels||[]).forEach(([t,wx,wy])=>{if(fogAt(wx,wy+40)<10)return;const x=(wx-CAM.dx)*CAM.z,y=(wy-CAM.dy)*CAM.z;ctx.fillStyle='rgba(0,0,0,.6)';ctx.fillText(t,x+1,y+1);ctx.fillStyle='rgba(232,228,218,.75)';ctx.fillText(t,x,y)});
+}
+// when a fire is lit on another map, remember which fire place it was
+DAY_HOOKS.actions.push((o,a)=>{if(o&&o.id==='fire'&&curMap())S._fireKey=o.key;});
+DAY_HOOKS.tick.push(()=>{if(curMap()&&S.fire&&!S.firePos)S.firePos=S._fireKey});
+// a packed radio keeps the evening call going on the road
+DAY_HOOKS.global.push(a=>{
+  if(!S||S.day<10||!(S.pack||[]).includes('radio')||S.t<19*60||(S.radioDay===S.day))return;
+  a.unshift({label:'라디오 켜기 (약속한 시간)',cost:15,ok:true,fn:()=>{S.radioDay=S.day;emote('note',2500);log(({10:'「…동굴은 무사히 지나셨습니까? 출구 쪽은 강 상류 계곡입니다. 거기서 하루 쉬세요.」',11:'「…내일부터 날이 갤 겁니다. 계곡 아래쪽에 옛날 배가 한 척 있다는 얘기를 들었어요.」',12:'「…배를 고치셨다고요? 건널 때 넓고 잔잔한 곳을 고르세요. 그리고 절대 일어서지 마세요.」',13:'「…동쪽 기슭이군요! 내일 낮, 하구 선착장으로 배를 보냅니다. 연기를 올려 주세요.」'})[S.day]||'「…들립니까? 내일 이 시간에.」')}});
+});
+// generic deadwood spots on road maps (twigs + wood for a campfire)
+DAY_HOOKS.actions.push((o,a)=>{
+  if(!o||o.id!=='mp_wood'||!curMap())return;const I=S.inv,k='wood_'+S.map+'_'+S.day;S.woodLeft=S.woodLeft||{};if(S.woodLeft[k]===undefined)S.woodLeft[k]=4;
+  a.push({label:'삭정이와 마른 장작 줍기',cost:15,ok:S.woodLeft[k]>0,why:'주울 만한 나무가 없다',fn:()=>{S.woodLeft[k]--;I.twig=(I.twig||0)+1;I.wood=(I.wood||0)+1;if(!I.bark&&!I.grass)I.grass=1;log('죽은 가지를 꺾어 잔가지와 장작을 모았다. (잔가지 +1, 장작 +1)')}});
+});
+// leaving home: the backpack is all you carry
+function applyPack(){
+  const I=S.inv,pk=S.pack&&S.pack.length?S.pack:['water','fire','blanket','food','aid','cord'];S.pack=pk;
+  const keep={bw:pk.includes('water')?I.bw:null,bottle:pk.includes('water')&&I.bottle,flint:pk.includes('fire')&&I.flint,steel:pk.includes('fire')&&I.steel,bark:pk.includes('fire')?Math.max(2,I.bark||0):0,
+    blanket:pk.includes('blanket'),dfish:pk.includes('food')?(I.dfish||0)+(I.fish||0):0,dand:pk.includes('food')?I.dand||0:0,can:pk.includes('food')?I.can||0:0,cloth:pk.includes('aid')&&I.cloth,bandage:pk.includes('aid')?I.bandage||0:0,
+    cord:pk.includes('cord')?Math.max(2,I.cord||0):0,rod:pk.includes('rod')&&I.rod,mirror:pk.includes('mirror')&&(I.mirror||S.mirrorDone?1:0),worm:0};
+  S.inv=Object.assign({wood:0,metal:0,grass:0,lighter:false,cray:0},keep);
+  if(pk.includes('food')&&!keep.dfish&&!keep.dand&&!keep.can)S.inv.dfish=2;
+  S.carry=[];
+}
+// blanket keeps the night bearable on the road
+DAY_HOOKS.tick.push(m=>{if(curMap()&&S.inv.blanket&&(S.t>=20*60)&&!S.wet)S.warm=clamp100(S.warm+.05*m)});
+// ===== DAY 10 · 산이 무너졌다 (동굴 안전) — new map: cave =====
+addIcons({
+  torch:[['..y....','.yoy...','..r....','..t....','..t....','..t....','..t....'],{y:'#f8d050',o:'#f08a2a',r:'#5a3e26',t:'#8a6a44'}],
+  resin:[['.......','..aa...','.aAAa..','.aAAAa.','..aAa..','...a...','.......'],{a:'#c88a2a',A:'#e8b050'}],
+  stick:[['......t','.....t.','....t..','...t...','..t....','.t.....','t......'],{t:'#8a6a44'}],
+  carving:[['kkkkkkk','kwkkwkk','kwwkwkk','kkkkkkk','kwkwkwk','kkkkkkk','kkkkkkk'],{k:'#4a4640',w:'#d8d4ca'}],
+});
+INV_EXTRA.push(['stick','마른 가지'],['resin','송진'],['torch','횃불']);
+(function(){
+  const shapes=[{e:[110,240,96,84]},{c:[180,240,300,232,34]},{e:[340,240,82,92]},{c:[362,170,382,80,26]},{e:[392,62,52,34]},
+    {c:[380,300,520,332,30]},{e:[565,300,72,62]},{c:[610,284,704,232,30]},{e:[742,232,72,74]},{c:[0,240,60,240,40]}];
+  const G=makeMask(shapes);
+  const bg=document.createElement('canvas');bg.width=LW;bg.height=LH;const b=bg.getContext('2d');
+  seed=1010;const nz=noiseGrid(10,LW,LH),nz2=noiseGrid(4,LW,LH);
+  for(let y=0;y<LH;y++)for(let x=0;x<LW;x++){
+    const w=x*2,h=y*2,m=maskAt(G,w,h);
+    // distance to wall for shading
+    let near=0;if(m){for(const [dx,dy] of [[-8,0],[8,0],[0,-8],[0,8]])if(!maskAt(G,w+dx,h+dy))near++}
+    if(m){const v=nz(x,y)*.6+nz2(x,y)*.4;let c=v<.35?'#3e3a36':v<.6?'#4a4540':'#56504a';if(near)c=near>1?'#2e2a26':'#36322e';if(bay(x,y)<.05)c='#6a645c';P(b,x,y,c)}
+    else{const v=nz(x,y);let c=v<.4?'#1a1816':v<.7?'#211e1b':'#28241f';if(maskAt(G,w,h+6)&&!m)c='#5a5248';if(maskAt(G,w,h+4)&&!m)c='#6e665a';P(b,x,y,c)}
+  }
+  // rubble and stalagmite stubs on the floor
+  for(let i=0;i<260;i++){const x=rnd()*LW|0,y=rnd()*LH|0;if(maskAt(G,x*2,y*2)){P(b,x,y,rnd()<.5?'#6a645c':'#2a2622',rnd()<.3?2:1,1)}}
+  // entrance (left) and exit (right) daylight floors
+  for(let y=0;y<LH;y++)for(let x=0;x<LW;x++){const w=x*2,h=y*2;if(!maskAt(G,w,h))continue;if(w<40){P(b,x,y,(x+y)%3?'#5e6a44':'#6a7a4c')}if(w>780){P(b,x,y,(x+y)%3?'#6a7a4c':'#5e6a44')}}
+  // drip pool in chamber C
+  for(let y=-5;y<=5;y++)for(let x=-10;x<=10;x++){if((x*x)/100+(y*y)/25<=1)P(b,L(560)+x,L(326)+y,(x+y)%4?'#2f4a5e':'#3e5f78')}
+  // the fallen boulders of the rockfall stretch
+  [[440,300],[470,350],[500,302]].forEach(([x,y])=>{P(b,L(x)-3,L(y)-2,'#5e5a52',7,4);P(b,L(x)-2,L(y)-2,'#7a756c',4,1)});
+  const STAL=[[200,200],[290,268],[320,180],[470,310],[600,258],[640,330],[700,262],[540,262]].map(([x,y],i)=>({x,y,st:bake(stackLayers(8,8,6+(i%3)*3,(c,k,n)=>{const r=3.5-k*3/n;ellipseFill(c,4,4,r,r,(dx,dy)=>dx+dy<-1?'#7a746a':'#58534c')},.35))}));
+  MAPS.cave={bg,G,walk:(x,y)=>!!maskAt(G,x,y),dark:()=>S.p.x>700?.15:S.p.x<70?.5:.93,
+    pois:[
+      {id:'cv_resin',x:58,y:196,r:26,name:'입구의 죽은 소나무'},
+      {id:'cv_debris',x:96,y:300,r:26,name:'흙더미 속 마른 가지'},
+      {id:'cv_make',x:140,y:246,r:28,name:'입구 바위'},
+      {id:'cv_fork',x:340,y:240,r:34,name:'갈림길'},
+      {id:'cv_air',x:392,y:66,r:34,name:'막다른 굴 끝'},
+      {id:'cv_rock',x:430,y:312,r:26,name:'금 간 천장 아래'},
+      {id:'cv_drip',x:560,y:316,r:24,name:'천장에서 떨어지는 물'},
+      {id:'mp_wood',x:774,y:290,r:26,name:'출구 앞 덤불의 삭정이'},
+      {id:'fire',key:'cave',x:720,y:206,r:28,name:'출구 바깥 모닥불 자리'},
+      {id:'bed',x:752,y:256,r:28,name:'동굴 출구 야영지'},
+    ],
+    areas:[{id:'cv_in',x:110,y:240,msg:'동굴 입구. 산사태로 무너진 바위 틈으로 찬 바람이 새어 나온다.'},{id:'cv_fk',x:340,y:240,msg:'길이 둘로 갈라진다. 위쪽과 아래쪽.'},{id:'cv_c',x:565,y:300,msg:'물방울 소리가 울린다. 넓은 굴이다.'},{id:'cv_out',x:742,y:232,msg:'빛이다! 출구가 보인다.'}],
+    labels:[['입구',100,170],['갈림길',340,160],['출구',742,170]],
+    heroLight:now=>S.torch>0&&S.torchLit?52+Math.sin(now/90)*2+(S.inBadAir?-24:0):12,
+    lights:()=>[[0,L(240),40,0],[LW,L(232),46,0]],
+    items:()=>STAL.map(s=>({y:L(s.y)+2,f:()=>putStack(s.st,L(s.x),L(s.y))})),
+    drawGround:now=>{
+      if(S.marked)[[316,262],[322,262],[318,258]].forEach(([x,y])=>P(lc,L(x),L(y),'#d8d4ca'));
+      // drips
+      const t=(now/600)%1;P(lc,L(560),L(300)+t*12,'#8cc0dc');
+    },
+    drawTop:now=>{if(S.torchLit&&S.torch>0){const x=L(S.p.x)+(S.p.face>0?5:-5),y=L(S.p.y)-12;P(lc,x,y+2,'#5a3e26',1,6);P(lc,x-1,y,S.inBadAir?'#7a9ad8':'#f08a2a',3,2);P(lc,x,y-1,S.inBadAir?'#aac0f0':'#f8d050')}},
+  };
+})();
+FINDS.push({id:'carving',map:'cave',day:10,x:372,y:126,kind:'note',name:'바위벽의 글씨',
+  text:'횃불을 비추자 바위벽에 무언가로 긁어 새긴 글씨가 드러났다.\n\n「수아 — 9월 4일. 아빠 여기 지나감. 위쪽은 숨이 막힌다. 아래쪽 길로.」\n\n50년 전, 아빠도 이 굴을 지났다.'});
+ON_START[10]=()=>{applyPack();setMap('cave',40,240);S.torch=0;S.torchLit=false;S.marked=false;S.visitNorth=false;S.lost=false;S.ceiling=false;S.rockHit=false;S.inBadAir=false;S.stickLeft=3;S.resinLeft=3};
+PRESET[10]=()=>{S.packed=true;S.pack=['water','fire','blanket','food','aid','cord'];S.inv.bw='rain';S.inv.dfish=2;S.kitWrapped=true;S.noteLeft=true;S.d9radio=true;S.notes.push(9)};
+DAY_HOOKS.actions.push((o,a)=>{
+  if(!o||S.day!==10)return;const I=S.inv;
+  if(o.id==='cv_resin')a.push({label:'송진 긁어모으기',cost:15,ok:(S.resinLeft||0)>0,why:'더 긁을 송진이 없다',fn:()=>{S.resinLeft--;I.resin=(I.resin||0)+1;log('죽은 소나무 껍질 틈에서 끈적한 송진을 긁어모았다. 불이 오래 붙는다. (송진 +1)')}});
+  if(o.id==='cv_debris')a.push({label:'마른 가지 줍기',cost:10,ok:(S.stickLeft||0)>0,why:'쓸 만한 가지가 없다',fn:()=>{S.stickLeft--;I.stick=(I.stick||0)+1;log('흙더미에서 팔 길이만 한 마른 가지를 골라냈다. (마른 가지 +1)')}});
+  if(o.id==='cv_make'){
+    a.push({label:'횃불 만들기 (가지·송진·천)',cost:20,ok:(I.stick||0)>=1&&(I.resin||0)>=1&&(!!I.cloth||(I.fiber||0)>0||(I.bark||0)>0),why:!(I.stick>0)?'마른 가지가 필요하다':!(I.resin>0)?'송진이 필요하다':'감을 천이나 껍질이 필요하다',fn:()=>{I.stick--;I.resin--;I.torch=(I.torch||0)+1;log('가지 끝에 천을 감고 송진을 듬뿍 발랐다. 횃불 하나. 하나 더 있으면 든든하겠다. (횃불 +1)')}});
+    if((I.torch||0)>0&&!S.torchLit)a.push({label:'횃불에 불붙이기',cost:10,ok:!!(I.flint&&I.steel),why:'부싯돌과 쇳조각이 없다',fn:()=>{I.torch--;S.torchLit=true;S.torch=240;Sfx.play('fire');emote('!');log('부싯돌 불꽃이 송진에 옮겨붙자 횃불이 확 타올랐다. 동굴 벽이 주황빛으로 일렁인다.')}});
+  }
+  if(o.id==='cv_fork'&&!S.marked)a.push({label:'돌로 돌아올 쪽 화살표 놓기',cost:10,ok:true,fn:()=>{S.marked=true;log('입구 쪽을 가리키게 돌 세 개로 화살표를 만들었다. 돌아올 때 헷갈리지 않게.')}});
+  if(o.id==='cv_air')a.push({label:'횃불 불꽃 살펴보기',cost:5,ok:S.torchLit&&S.torch>0,why:'불빛이 없다',fn:()=>{S.airChecked=true;emote('sweat');log('불꽃이 작아지고 파르르 떨린다. 숨이 가쁘다. 공기가 나쁘다. 당장 돌아가야 한다.')}});
+  if(o.id==='cv_rock'&&!S.ceiling)a.push({label:'천장 살피기',cost:10,ok:S.torchLit&&S.torch>0,why:'어두워서 안 보인다',fn:()=>{S.ceiling=true;log('천장에 굵은 금이 가 있고, 바닥엔 새로 떨어진 돌가루가 있다. 금 간 곳 아래를 피해 벽 쪽으로, 멈추지 말고 지나가자.')}});
+  if(o.id==='cv_drip')a.push({label:'떨어지는 물 받기',cost:15,ok:!!I.bottle&&!I.bw,why:I.bottle?'병이 이미 차 있다':'담을 병이 없다',fn:()=>{I.bw='rain';log('천장에서 똑똑 떨어지는 물을 한참 받았다. 차갑고 맑다.')}});
+});
+// torch & cave hazards
+DAY_HOOKS.global.push(a=>{
+  if(!S||S.day!==10||S.map!=='cave')return;const I=S.inv;
+  if(S.torchLit&&S.torch<120&&(I.resin||0)>0)a.push({bag:'resin',label:'횃불에 송진 더 바르기',cost:5,ok:true,fn:()=>{I.resin--;S.torch=Math.min(240,S.torch+120);log('횃불에 송진을 덧발랐다. 불이 다시 힘차게 탄다.')}});
+  if(!S.torchLit&&(I.torch||0)>0)a.push({bag:'torch',label:'예비 횃불 붙이기',cost:10,ok:!!(I.flint&&I.steel),why:'부싯돌과 쇳조각이 없다',fn:()=>{I.torch--;S.torchLit=true;S.torch=240;Sfx.play('fire');log('예비 횃불에 불을 붙였다. 빛이 두 개 있어야 하는 이유를 알겠다.')}});
+});
+DAY_HOOKS.tick.push(m=>{
+  if(S.day!==10||S.map!=='cave')return;const p=S.p;
+  if(S.torchLit){S.torch-=m*(S.inBadAir?2:1);if(S.torch<=0){S.torchLit=false;S.torch=0;emote('…');log('횃불이 꺼졌다. 칠흑 같은 어둠.'+((S.inv.torch||0)>0?' 예비 횃불이 있다.':' 손으로 벽을 짚고 더듬어야 한다.'))}}
+  const inN=p.y<170&&p.x>320&&p.x<440;
+  if(inN)S.visitNorth=true;
+  S.inBadAir=Math.hypot(p.x-392,p.y-62)<56;
+  if(S.inBadAir){S.hp-=.08*m;S.mind-=.05*m;once('d10air',()=>{emote('sweat');log('숨이 막힌다. 머리가 핑 돈다. 여기는 오래 있으면 안 된다.')})}
+  if(S.visitNorth&&!inN&&p.y>200&&p.x<420&&p.x>260&&!S.marked&&!S.lost){S.lost=true;S.t+=50;S.mind=Math.max(0,S.mind-10);emote('?');log('굴에서 나오니 어느 쪽에서 왔는지 헷갈린다. 한참을 헤맸다. 갈림길에 표시를 해 둘 걸.')}
+  if(p.x>430&&p.x<510&&p.y>286&&p.y<356&&!S.rockPassed){S.rockPassed=true;if(!S.ceiling){S.rockHit=true;S.hp-=14;emote('sweat');Sfx.play('rock');log('머리 위에서 돌이 우수수 떨어졌다! 어깨를 맞았다. 천장을 먼저 살폈어야 했다. (체력 -14)')}else log('금 간 곳을 피해 벽에 붙어 지났다. 등 뒤로 작은 돌이 떨어지는 소리.')}
+  if(p.x>700)once('d10out',()=>{emote('♥');log('바깥 공기다. 동굴을 빠져나왔다.')});
+});
+MONO[10]=()=>{
+  const I=S.inv,p=S.p;let s;
+  if(p.x>700)s=S.t>=17*60?'출구 야영지에서 쉬자. 내일은 강을 따라 내려간다.':'동굴을 나왔다. 출구 야영지에 불을 피우고 쉬자.';
+  else if(!S.torchLit&&!(I.torch>0))s=(I.stick>0&&I.resin>0)?'입구 바위에서 가지에 천을 감고 송진을 발라 횃불을 만들자.':'동굴은 칠흑이다. 횃불이 필요하다. 입구의 죽은 소나무에서 송진을, 흙더미에서 마른 가지를.';
+  else if(!S.torchLit)s='횃불이 있다. 입구 바위에서 불을 붙이자. 예비 횃불도 하나 더 만들어 두면 좋다.';
+  else if(S.inBadAir)s='숨이 막힌다. 불꽃이 작아졌다. 왔던 길로 당장 돌아가자!';
+  else if(!S.marked&&p.x>260)s='갈림길이다. 돌아올 쪽을 표시해 두자.';
+  else if(p.x>380&&p.y>280&&!S.ceiling&&!S.rockPassed)s='천장에서 돌가루가 떨어진다. 지나가기 전에 천장을 살피자.';
+  else if(S.torch<60)s='횃불이 다 타 간다. 송진을 더 바르거나 예비 횃불을 준비하자.';
+  else s='횃불을 들고 천천히. 출구는 동쪽 어딘가에 있다.';
+  return {s,count:`동굴 — 횃불 ${S.torchLit?Math.max(0,S.torch|0)+'분':'✗'} · 표시 ${ck(S.marked)} · 천장 ${ck(S.ceiling)} · 출구 ${ck(p.x>700)}`};
+};
 // @@DAY_WORLD@@
 // ---------- loop ----------
 let last=performance.now();
@@ -1625,9 +1850,9 @@ function frame(now){
     else if(S.target){const tx=S.target.x-p.x,ty=S.target.y-p.y,d=Math.hypot(tx,ty);if(d<3)S.target=null;else{dx=tx/d;dy=ty/d}}
     S._walk=!!(dx||dy);
     if(dx||dy){
-      const l=Math.hypot(dx,dy),sp=.15*dt;
+      const l=Math.hypot(dx,dy),sp=.15*dt,ox=p.x,oy=p.y;
       p.x+=dx/l*sp;p.y+=dy/l*sp;if(dx)p.face=dx>0?1:-1;const ps0=Math.floor(p.step);p.step+=dt/140;if(Math.floor(p.step)!==ps0&&Math.floor(p.step)%2===0)Sfx.play('step',inShelter()?'wood':stormLevel()>.2?'splash':'grass');
-      p.x=Math.max(14,Math.min(645,p.x));p.y=Math.max(22,Math.min(H-14,p.y));
+      if(S.map&&S.map!=='home')collideMap(MAPS[S.map],p,ox,oy);else{p.x=Math.max(14,Math.min(645,p.x));p.y=Math.max(22,Math.min(H-14,p.y))}
     }
     updateFog();
     if(inShelter())placeCarried();
@@ -1880,7 +2105,7 @@ function endDay(forced){
   card.innerHTML=`<h2>밤 — 생존 일지</h2><div class="sub">${S.day}일차 · 발견한 기억 ${memCount}/${memTotal()}</div>
   <div class="paper">${L.map(l=>`<p>${l}</p>`).join('')}</div>
   <div class="note"><div class="nh">📖 생존 수첩 ${S.day}쪽 — ${N.title}</div><ul>${N.body.map(b=>`<li>${b}</li>`).join('')}</ul><div class="did">오늘 직접 해 본 것: ${N.did()}</div></div>
-  ${placed.length?`<p class="small" style="text-align:center;margin-bottom:0">쉼터에 놓인 것</p><div class="shelf">${placed.map(f=>iconImg(f.id,36)).join(' ')}</div>`:''}
+  ${placed.length&&S.day<10?`<p class="small" style="text-align:center;margin-bottom:0">쉼터에 놓인 것</p><div class="shelf">${placed.map(f=>iconImg(f.id,36)).join(' ')}</div>`:''}
   <p class="small">체력 ${Math.round(S.hp)} · 식량 ${Math.round(S.food)} · 물 ${Math.round(S.water)}${S.day>=2?' · 체온 '+Math.round(S.warm):''} · 정신력 ${Math.round(S.mind)}</p>
   ${next}`;
   ov.classList.remove('hide');
@@ -2047,6 +2272,22 @@ JOURNAL[9]=(forced,home)=>{
   L.push('쉼터에서의 마지막 밤.');
   return L;
 };
+DAYS[10]={theme:'산이 무너졌다',wake:'쉼터를 떠났다. 무너진 산 앞에 섰다. 바위 틈으로 찬 바람이 분다.',
+  intro:()=>`<h2>10일차</h2><div class="sub">산이 무너졌다 · 새 지도: 동굴</div>
+  <p>새벽에 쉼터 문을 닫고 나왔다. 산길은 바위로 막혀 있고, 그 옆으로 시커먼 굴이 입을 벌리고 있다. 대피소가 말한 그 동굴이다.</p>
+  <p>오늘은 <b>어두운 동굴을 안전하게 지나는 법</b>을 익힌다. 빛, 표시, 공기, 그리고 머리 위.</p>
+  <p class="small">이제 배낭에 꾸린 것만 가지고 있어요.<br>동굴 안은 아주 어둡습니다. 빛이 없으면 바로 앞도 보이지 않아요.<br>출구에 도착하면 그곳 야영지에서 하루를 마칩니다.</p>`};
+NOTES[10]={title:'동굴 안전',body:['빛은 두 개 이상 가지고 들어간다. 하나가 꺼지면 바로 쓸 예비가 있어야 한다.','갈림길마다 돌아올 쪽을 가리키는 표시를 남긴다.','불꽃이 작아지거나 숨이 가빠지면 공기가 나쁘다는 뜻. 지체 없이 왔던 길로 돌아간다.','천장의 금, 바닥에 새로 떨어진 돌가루는 낙석 신호. 그 아래에 머물지 않는다.','비가 많이 온 날, 물이 차오르는 동굴에는 들어가지 않는다.'],
+  did:()=>[S.torchLit||S.torch?'횃불 만들기':null,(S.inv.torch||0)>0?'예비 횃불':null,S.marked?'갈림길 표시':null,S.airChecked?'나쁜 공기 알아채기':null,S.ceiling?'천장 살피기':null].filter(Boolean).join(' · ')||'아직 못 해 봄'};
+JOURNAL[10]=(forced,home)=>{
+  const L=['10일차.'];
+  L.push(S.p.x>700?'동굴을 지났다. 출구로 나왔을 때 하늘이 이렇게 넓었나 싶었다.':'동굴을 다 지나지 못했다. 어둠 속에서 밤을 보낸다.');
+  if(S.lost)L.push('갈림길에서 길을 잃고 한참을 헤맸다. 표시 하나면 됐을 텐데.');else if(S.marked)L.push('갈림길에 돌로 화살표를 놓았다. 작은 표시가 길이 된다.');
+  if(S.airChecked||S.flags&&S.flags.d10air)L.push('위쪽 굴 끝에서 숨이 막혔다. 횃불이 파랗게 떨렸다. 바로 돌아섰다.');
+  if(S.rockHit)L.push('천장에서 떨어진 돌에 어깨를 맞았다. 머리 위를 먼저 봐야 했다.');else if(S.ceiling)L.push('금 간 천장 아래를 벽에 붙어 지났다.');
+  if(S.found.carving)L.push('바위벽에 아빠가 새긴 글씨. 「수아 — 아빠 여기 지나감. 아래쪽 길로.」 50년 전 같은 굴, 같은 갈림길.');
+  return L;
+};
 // @@DAY_SCREENS@@
 const WEEK=[
   {d:1,theme:'물이 탁해졌다',skill:'식수 만들기',ready:true},
@@ -2058,7 +2299,7 @@ const WEEK=[
   {d:7,theme:'누군가에게',skill:'구조 신호 보내기',ready:true},
   {d:8,theme:'끈이 필요하다',skill:'끈과 매듭',w:2,ready:true},
   {d:9,theme:'짐을 꾸리다',skill:'장거리 이동 준비',w:2,ready:true},
-  {d:10,theme:'산이 무너졌다',skill:'동굴 안전',w:2},
+  {d:10,theme:'산이 무너졌다',skill:'동굴 안전',w:2,ready:true},
   {d:11,theme:'하늘을 읽다',skill:'날씨 예측',w:2},
   {d:12,theme:'배를 엮다',skill:'뗏목·배 수리',w:2},
   {d:13,theme:'물을 건너다',skill:'물가 안전',w:2},
