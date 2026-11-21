@@ -2122,6 +2122,64 @@ MONO[13]=()=>{
   else s='넓고 잔잔한 곳으로. 몸은 낮게, 뱃머리는 상류 쪽으로.';
   return {s,count:`강 건너기 — 물살 확인 ${n}/3 · 짐 묶기 ${ck(S.lashed)} · 마른 옷 ${ck(S.dryBag)} · 건넘 ${ck(S.crossed)}`};
 };
+// ===== DAY 14 · 선착장 (신호와 낯선 사람 만나기) =====
+const SIG_SPOTS=[[620,370],[660,370],[640,404]];
+ON_START[14]=()=>{if(S.map!=='valley')goValley(680,250);else setMap('valley',680,250);S.crossed=true;S.boatPos=S.boatPos&&S.boatPos.x>500?S.boatPos:{x:578,y:312};S.boatUp=true;S.rainLv=0;S.clouds=1;S.signalFires=[];S.smoke=false;S.ferryT=undefined;S.boatArrived=false;S.met=false;S.watched=false;S.flashed=false;S.greenLeft=4};
+PRESET[14]=()=>{S.notes.push(13);S.crossed=true;S.crossFord='B';S.boatSecured=true};
+DAY_HOOKS.tick.push(m=>{
+  if(S.day!==14||S.map!=='valley')return;
+  if(S.ferryT===undefined&&((S.smoke&&S.t>=11.5*60)||S.t>=15*60)){S.ferryT=S.t;emote('!');Sfx.play('discover');log(S.smoke?'하구 쪽에서 작은 배 한 척이 거슬러 올라온다! 연기를 본 것이다.':'오후 늦게, 하구 쪽에서 작은 배 한 척이 거슬러 올라온다. 한참을 찾아 헤맨 모양이다.')}
+  if(S.ferryT!==undefined&&!S.boatArrived&&S.t>=S.ferryT+60){S.boatArrived=true;log('배가 선착장에 닿았다. 두 사람이 내린다. 사람이다. 50년 만에 보는 사람.')}
+  if(S.boatArrived&&Math.hypot(S.p.x-DOCK.x,S.p.y-DOCK.y)<150)once('d14see',()=>{emote('?');log('노인 한 명과 아이 하나. 이쪽을 두리번거린다. 심장이 쿵쿵 뛴다.')});
+});
+DAY_HOOKS.actions.push((o,a)=>{
+  if(!o||S.day!==14)return;const I=S.inv;
+  if(o.id==='v_epine')a.push({label:'생솔가지 꺾기',cost:10,ok:(S.greenLeft||0)>0,why:'손 닿는 가지를 다 꺾었다',fn:()=>{S.greenLeft--;I.bough=(I.bough||0)+1;log('물기 많은 푸른 솔가지를 꺾었다. 마른 나무와 달리 태우면 흰 연기가 많이 난다. (솔가지 +1)')}});
+  if(o.id==='v_signal'){
+    const n=S.signalFires.length;
+    if(n<3)a.push({label:`신호 모닥불 ${n+1}/3 피우기 (장작·잔가지)`,cost:20,ok:(I.wood||0)>=1&&(I.twig||0)>=1&&!!(I.flint&&I.steel),why:!(I.flint&&I.steel)?'부싯돌과 쇳조각이 없다':'장작과 잔가지가 하나씩 필요하다',fn:()=>{I.wood--;I.twig--;S.signalFires.push(SIG_SPOTS[n]);Sfx.play('fire');log(n===0?'트인 자갈밭 한가운데 불을 피웠다. 하늘에서도 강에서도 잘 보이는 곳이다.':n===1?'두 번째 불. 세 개를 삼각형으로 놓으면 "도와 달라"는 신호가 된다.':'세 번째 불. 불 세 개가 삼각형을 이뤘다. 조난 신호다.')}});
+    if(n>0&&!S.smoke)a.push({label:'생솔가지 얹어 연기 올리기',cost:10,ok:(I.bough||0)>=1,why:'연기를 낼 생솔가지가 필요하다',fn:()=>{I.bough--;S.smoke=true;emote('!');log('생솔가지를 얹자 하얀 연기가 뭉게뭉게 하늘로 치솟는다. 멀리서도 보일 것이다.')}});
+  }
+  if(o.id==='v_stranger'&&!S.met){
+    if(!S.watched)a.push({label:'바위 뒤에서 먼저 지켜보기',cost:10,ok:true,fn:()=>{S.watched=true;log('흰머리 노인과 열 살쯤 된 아이. 손에 든 건 노와 물통뿐, 무기는 없다. 노인이 아이 어깨를 감싸고 강 위쪽을 살핀다. 누군가를 찾는 눈빛이다.')}});
+    a.push({label:'빈손을 보이며 천천히 다가가기',cost:10,ok:true,fn:()=>setTimeout(meetStranger,30)});
+  }
+  if(o.id==='v_dock'&&S.met)a.push({label:'함께 배에 오르기',cost:10,ok:true,fn:()=>{S.boarded=true;Sfx.play('water');setTimeout(()=>endDay(false),400)}});
+});
+DAY_HOOKS.global.push(a=>{
+  if(!S||S.day!==14||!S.inv.mirror||S.flashed||S.ferryT!==undefined||S.t<10*60)return;
+  a.push({bag:'mirror',label:'거울로 햇빛 비춰 신호 보내기',cost:15,ok:S.t<17*60,why:'해가 너무 낮다',fn:()=>{S.flashed=true;S.smoke=true;emote('!');log('거울로 햇빛을 받아 강 하구 쪽으로 번쩍, 번쩍, 번쩍. 맑은 날엔 수십 리 밖에서도 보인다.')}});
+});
+function meetStranger(){
+  const food=foodCount()>0,water=!!S.inv.bw;
+  choiceCard('첫마디',S.watched?'무기는 없다. 노인과 아이.':'누구인지 모른다.','두 사람이 나를 보고 멈춰 선다. 아이가 노인 뒤로 숨는다. 무슨 말을 할까?',
+    [{t:'"누구야! 가까이 오지 마!"',retry:'노인이 움찔하며 아이를 등 뒤로 감춘다. 겁을 주면 서로 다칠 뿐이다.'},
+     {t:'"안녕하세요. 저는 수아예요. 라디오를 듣고 왔어요."',d:'빈손을 보이고, 천천히, 먼저 이름을'},
+     {t:'말없이 다가가 배에 올라탄다',retry:'노인이 노를 들어 막아선다. 처음 보는 사이다. 인사가 먼저다.'}],()=>{
+    log('"…수아? 네가 그 라디오의 수아구나." 노인의 어깨에서 힘이 빠진다.');
+    choiceCard('살핌','노인이 다가와 묻는다','"어디 다친 데는 없니? 며칠이나 걸어왔어?"',
+      [{t:'괜찮다고만 한다',retry:'노인이 고개를 젓는다. "숨기면 도와줄 수가 없단다."'},
+       {t:'몸 상태와 지나온 길을 솔직하게 말한다',d:`체력 ${Math.round(S.hp)} · 동굴, 강, 비`}],()=>{
+      const opts=[];if(food)opts.push({t:'남은 먹을 것을 나눈다',d:'말린 생선 한 마리'});if(water)opts.push({t:'물병을 건넨다',d:'끓인 물'});opts.push({t:'수아호를 보여 준다',d:'아빠가 만든 배'});
+      choiceCard('나눔','처음 만난 사람에게','아이가 배고픈 눈으로 쳐다본다. 무엇을 내밀까?',opts,i=>{
+        const t=opts[i].t;if(t.startsWith('남은')){if(S.inv.dfish)S.inv.dfish--;else if(S.inv.can)S.inv.can--;else if(S.inv.dand)S.inv.dand--;S.shared='food'}else if(t.startsWith('물병')){S.shared='water'}else S.shared='boat';
+        S.met=true;S.mind=clamp100(S.mind+25);emote('♥');Music.musicBox&&Music.musicBox();
+        choiceCard('수아호','노인의 이야기',`${S.shared==='food'?'아이가 생선을 받아 들고 활짝 웃는다. ':S.shared==='water'?'노인이 물을 한 모금 마시고 눈을 감는다. ':''}노인이 강가의 배를 보더니 걸음을 멈춘다.<br><br>"수아호…? 이 배를 어디서… 이건 우리 아버지가 너희 아버지랑 같이 만든 배다. 50년 전, 두 분이 이 강을 오가며 사람들을 날랐지. 아버지는 늘 그러셨어. 언젠가 그 집 아이가 이 강을 건너올 거라고."<br><br>"가자, 수아. 하구에 우리 사람들이 있다. 열두 명. 너까지 열셋이야."`,[{t:'고개를 끄덕인다'}],()=>log('노인이 손을 내민다. 선착장으로 가서 함께 배에 오르자.'),'boatname');
+      },'dfish');
+    });
+  },'radio');
+}
+MONO[14]=()=>{
+  const I=S.inv,n=(S.signalFires||[]).length;let s;
+  if(S.met)s='선착장으로 가서 함께 배에 오르자.';
+  else if(S.boatArrived)s=S.watched?'무기는 없다. 빈손을 보이며 천천히 다가가자. 먼저 이름을.':'선착장에 사람이 있다! 서두르지 말고, 먼저 바위 뒤에서 지켜보자.';
+  else if(S.ferryT!==undefined)s='배가 올라온다! 선착장 쪽으로 가 보자. 천천히.';
+  else if(!n)s=(I.wood>0&&I.twig>0)?'트인 자갈밭에 신호 모닥불을 피우자. 연기가 보이게.':'선착장 사람들이 볼 수 있게 신호를 올리자. 솔숲에서 장작과 잔가지부터.';
+  else if(!S.smoke)s=(I.bough>0)?'불 위에 생솔가지를 얹어 흰 연기를 올리자.':'연기가 필요하다. 동쪽 기슭의 푸른 소나무에서 생솔가지를 꺾자.';
+  else if(n<3)s='연기가 오른다. 불 셋을 삼각형으로 놓으면 조난 신호가 된다. 기다리며 지켜보자.';
+  else s='신호는 올렸다. 강 하구 쪽을 지켜보며 기다리자.';
+  return {s,count:`선착장 — 신호불 ${n}/3 · 연기 ${ck(S.smoke)} · 배 ${S.boatArrived?'도착':S.ferryT!==undefined?'오는 중':'✗'} · 만남 ${ck(S.met)}`};
+};
 // @@DAY_WORLD@@
 // ---------- loop ----------
 let last=performance.now();
@@ -2383,7 +2441,8 @@ function endDay(forced){
   const placed=S.placedOrder.map(id=>FINDS.find(f=>f.id===id));
   const memCount=FINDS.filter(f=>f.kind==='mem'&&S.found[f.id]&&(f.day||1)<=S.day).length;
   const nx=WEEK.find(w=>w.d===S.day+1);
-  const next=S.day!==7&&nx
+  const next=S.day===14?(S.met?`<div class="btns"><button id="ending2">2부의 끝으로</button><button id="again" class="ghost">14일차 다시 하기</button><button id="pick" class="ghost">날짜 선택</button></div>`:`<p class="small">아직 선착장 사람들을 만나지 못했다.</p><div class="btns"><button id="again">14일차 다시 하기</button><button id="pick" class="ghost">날짜 선택</button></div>`)
+    :S.day!==7&&nx
     ?`<p class="small">내일의 주제 — <b style="color:var(--accent)">${S.day+1}일차: ${nx.theme}</b>${nx.ready?'':' (아직 준비 중)'}</p><div class="btns">${nx.ready?`<button id="next">${S.day+1}일차로 넘어가기</button>`:''}<button id="again" class="ghost">${S.day}일차 다시 하기</button><button id="pick" class="ghost">날짜 선택</button></div>`
     :S.day===7?`<div class="btns"><button id="ending">1부의 끝으로</button><button id="again" class="ghost">7일차 다시 하기</button><button id="pick" class="ghost">날짜 선택</button></div>`
     :`<p class="small">여기까지 만들었어요. 다음 이야기는 준비 중이에요.</p><div class="btns"><button id="again" class="ghost">${S.day}일차 다시 하기</button><button id="pick" class="ghost">날짜 선택</button></div>`;
@@ -2397,6 +2456,7 @@ function endDay(forced){
   const $=id=>document.getElementById(id);
   if($('next'))$('next').onclick=()=>startDay(S.day+1);
   if($('ending'))$('ending').onclick=showEnding;
+  if($('ending2'))$('ending2').onclick=showEnding2;
   if($('again'))$('again').onclick=retryDay;
   if($('restart'))$('restart').onclick=()=>startDay(1);
   if($('pick'))$('pick').onclick=()=>showTitle(false);
@@ -2618,6 +2678,43 @@ JOURNAL[13]=()=>{
   L.push('동쪽 기슭. 저 아래 선착장이 보인다. 내일이다.');
   return L;
 };
+DAYS[14]={theme:'선착장',wake:'동쪽 기슭에서 맞는 아침. 강 하구 쪽으로 낡은 선착장이 보인다.',
+  intro:()=>`<h2>14일차</h2><div class="sub">선착장</div>
+  <p>라디오의 목소리가 말했다. 오늘 낮, 하구 선착장으로 배를 보내겠다고. 연기를 올려 달라고.</p>
+  <p>오늘은 <b>멀리서 보이는 신호를 올리고, 처음 만나는 사람을 안전하게 만나는 법</b>을 익힌다.</p>
+  <p class="small">50년 만에 사람을 만납니다. 서두르지 마세요.</p>`};
+NOTES[14]={title:'신호와 만남',body:['낮에는 연기, 밤에는 불빛. 생솔가지나 젖은 풀을 얹으면 흰 연기가 짙게 오른다.','불 세 개를 삼각형으로 놓는 것은 국제적인 조난 신호다.','맑은 날 거울 반사는 수십 리 밖에서도 보인다.','낯선 사람은 먼저 멀리서 지켜본다. 숫자, 손에 든 것, 몸짓.','다가갈 땐 빈손을 보이고 천천히, 먼저 이름을 말한다. 아픈 곳은 숨기지 않는다. 나눌 것이 있으면 나눈다.'],
+  did:()=>[(S.signalFires||[]).length?'신호 모닥불':null,(S.signalFires||[]).length>=3?'삼각형 조난 신호':null,S.smoke?'연기 올리기':null,S.watched?'멀리서 지켜보기':null,S.met?'이름 먼저 말하기 · 나누기':null].filter(Boolean).join(' · ')||'아직 못 해 봄'};
+JOURNAL[14]=()=>{
+  const L=['14일차.'];
+  L.push(S.smoke?((S.signalFires||[]).length>=3?'자갈밭에 불 세 개를 삼각형으로 피우고 생솔가지를 얹었다. 흰 연기가 하늘 높이 올랐다.':'신호 불에 생솔가지를 얹어 흰 연기를 올렸다.'):'신호를 제대로 올리지 못했다. 그래도 그들은 오후 늦게 찾아왔다.');
+  if(!S.met){L.push(S.boatArrived?'선착장에 사람들이 있었다. 하지만 다가가지 못했다. 내일은… 용기를 내자.':'오늘은 아무도 오지 않았다.');return L}
+  L.push(S.watched?'바위 뒤에서 먼저 지켜봤다. 노인 한 명, 아이 하나. 무기는 없었다.':'선착장에 노인과 아이가 있었다.');
+  L.push('빈손을 보이고 이름을 말했다. "저는 수아예요."');
+  L.push(S.shared==='food'?'아이에게 생선을 나눠 주었다. 아이가 웃었다.':S.shared==='water'?'노인에게 물을 건넸다.':'노인에게 수아호를 보여 주었다.');
+  L.push('수아호는 노인의 아버지와 우리 아빠가 함께 만든 배였다. 아빠는 혼자가 아니었다. 그리고 나도.');
+  return L;
+};
+function showEnding2(){
+  const skills=['끈과 매듭','짐 꾸리기','동굴 안전','날씨 읽기','배 고치기','물 건너기','신호와 만남'];
+  Music.musicBox();
+  card.innerHTML=`<h2>마지막 사람 · 2부 끝</h2><div class="sub">멸망 후 50년, 열네 날</div>
+  <div class="paper">노인의 배가 하구로 미끄러져 간다. 뒤에는 밧줄에 묶인 수아호가 따라온다.
+
+아이가 내 옆에 붙어 앉아 이것저것 묻는다. 동굴은 무서웠는지, 비는 얼마나 왔는지, 배는 어떻게 고쳤는지.
+
+나는 하나씩 대답한다. 물을 만드는 법, 불을 피우는 법, 북쪽을 찾는 법, 끈을 꼬는 법, 하늘을 읽는 법.
+
+열네 날 동안 익힌 것들. 이제 이 아이에게 가르쳐 줄 수 있다.
+
+나는 마지막 사람이 아니었다.</div>
+  <div class="note"><div class="nh">📖 생존 수첩 — 둘째 주에 익힌 것</div><ul>${skills.map((k,i)=>`<li>${i+8}일차 · ${k} ${S.notes.includes(i+8)?'✓':''}</li>`).join('')}</ul></div>
+  <p class="small">3부 — 하구의 사람들. 준비 중이에요.</p>
+  <div class="btns"><button id="restart" class="ghost">처음부터</button><button id="pick" class="ghost">날짜 선택</button></div>`;
+  ov.classList.remove('hide');
+  const $=id=>document.getElementById(id);
+  $('restart').onclick=()=>startDay(1);$('pick').onclick=()=>showTitle(false);
+}
 // @@DAY_SCREENS@@
 const WEEK=[
   {d:1,theme:'물이 탁해졌다',skill:'식수 만들기',ready:true},
@@ -2633,7 +2730,7 @@ const WEEK=[
   {d:11,theme:'하늘을 읽다',skill:'날씨 예측',w:2,ready:true},
   {d:12,theme:'배를 엮다',skill:'뗏목·배 수리',w:2,ready:true},
   {d:13,theme:'물을 건너다',skill:'물가 안전',w:2,ready:true},
-  {d:14,theme:'선착장',skill:'낯선 사람과 만나기',w:2},
+  {d:14,theme:'선착장',skill:'낯선 사람과 만나기',w:2,ready:true},
 ];
 // a reasonable "yesterday" for starting a later day directly
 function presetFor(n){
