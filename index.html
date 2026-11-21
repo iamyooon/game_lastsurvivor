@@ -222,7 +222,7 @@ const FINDS=[
 ];
 FINDS.push(
   {id:'umbrella',day:2,x:250,y:96,kind:'mem',name:'노란 우산',
-   text:'무너진 벽 틈에 꽂혀 있던 아이용 우산. 노란 천은 바랬고 살이 두 개 부러졌다.\n펼치니 안쪽에 매직으로 쓴 이름.\n\n「3학년 2반 이수아」'},
+   text:'무너진 벽 틈에 꽂혀 있던 아이용 우산. 노란 천은 바랬고 살이 두 개 부러졌다.\n펼치니 안쪽에 매직으로 쓴 이름.\n\n「3학년 2반 윤수아」'},
   {id:'newspaper',day:2,at:17*60,x:452,y:318,kind:'mem',name:'날아온 신문 조각',
    text:'폭풍에 날려 와 쉼터 앞에 들러붙은 신문 조각. 젖어서 글자가 반쯤 지워졌다.\n\n「…북부 대피소 수용 인원 초과… 도착하지 못한 시민은 각 지역 임시 거처에서 구조를 기다리…」\n\n날짜는 그날의 다음 날이다.'}
 );
@@ -671,7 +671,7 @@ const heroName=()=>HERO_NAMES[CHAR]||'수아';
 function nameFix(t){
   const n=heroName();if(n==='수아'||t.indexOf('수아')<0)return t;
   const b=(n.charCodeAt(n.length-1)-0xAC00)%28!==0,I=b?n+'이':n;
-  return t.replace(/이수아/g,'이'+n).replace(/수아야/g,b?n+'아':n+'야').replace(/수아예요/g,b?n+'이에요':n+'예요')
+  return t.replace(/윤수아/g,'윤'+n).replace(/수아야/g,b?n+'아':n+'야').replace(/수아예요/g,b?n+'이에요':n+'예요')
     .replace(/수아(가|는|라는|라고|구나|였다|였)/g,(m,p)=>I+p).replace(/수아/g,n);
 }
 function fixNode(root){
@@ -1452,7 +1452,7 @@ function radioAnswer(){
 
 잠시 침묵. 그리고 조심스러운 목소리.
 
-「…강가 오두막, 맞습니까? 혹시… 이수아 씨입니까? 대피소 기록에… 아버님이 매일 이 주파수로 그 이름을 부르셨다고…」
+「…강가 오두막, 맞습니까? 혹시… 윤수아 씨입니까? 대피소 기록에… 아버님이 매일 이 주파수로 그 이름을 부르셨다고…」
 
 손이 떨려 다이얼을 놓칠 뻔했다.
 
@@ -2442,7 +2442,7 @@ function journal2(forced,home){
   if(S.wasWet)L.push('비에 젖은 채로 한참 떨었다. 젖으면 몸이 금방 식는다는 걸 뼈저리게 배웠다.');
   L.push(S.storedWood?'마른 땔감을 안에 들여놔서 다행이다. 내일 불을 피울 수 있을 것이다.':'땔감이 다 젖었을 것이다. 내일 불 피우기가 걱정이다.');
   if(S.barrelFull)L.push('빗물통이 가득 찼다. 폭풍도 하나는 주고 갔다.');
-  if(seen('umbrella'))L.push('노란 우산 안쪽에 적힌 이름, 이수아. 3학년 2반.');
+  if(seen('umbrella'))L.push('노란 우산 안쪽에 적힌 이름, 윤수아. 3학년 2반.');
   if(seen('newspaper'))L.push('바람에 날아온 신문 조각. 북부 대피소, 수용 초과. 그럼 수아의 아빠는…');
   if(forced&&!home)L.push('폭풍 속에서 쉼터를 찾느라 한참을 헤맸다.');
   return L;
@@ -2569,7 +2569,7 @@ JOURNAL[7]=(forced,home)=>{
   L.push(done.length?`${done.join(', ')}. 내가 아는 모든 방법으로 여기 있다고 외쳤다.`:'신호를 보내지 못했다. 아직 용기가 나지 않았던 걸까.');
   if(S.answered){
     L.push('그리고 밤, 라디오가 대답했다.');
-    L.push('「혹시 이수아 씨입니까?」');
+    L.push('「혹시 윤수아 씨입니까?」');
     L.push('운동화, 우산, 크레용 그림, 편지. 내 이름이 적혀 있던 물건들. 나는 50년 동안 내 이름을 잊고 살았다.');
     L.push('아빠는 매일 그 이름을 불렀다고 한다.');
   }else L.push('라디오는 잡음뿐이었다. 내일 다시 해 보자.');
